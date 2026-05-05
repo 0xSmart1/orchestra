@@ -1,9 +1,9 @@
-import { EventTypeType } from '../constants';
+import { EventTypeName } from '../constants';
 
 export interface Event {
   id: string;
   projectId: string;
-  type: EventTypeType;
+  type: EventTypeName;
   agentId: string | null;
   taskId: string | null;
   runId: string | null;

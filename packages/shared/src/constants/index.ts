@@ -1,3 +1,5 @@
-export { TaskStatus, type TaskStatusType } from './task-status';
-export { AgentStatus, type AgentStatusType } from './agent-status';
-export { EventType, type EventTypeType } from './event-type';
+export { TaskStatus, type TaskStatusValue } from './task-status';
+export { AgentStatus, type AgentStatusValue } from './agent-status';
+export { EventType, type EventTypeName } from './event-type';
+export { RunStatus, type RunStatusValue } from './run-status';
+export { ArtifactType, type ArtifactTypeValue } from './artifact-type';

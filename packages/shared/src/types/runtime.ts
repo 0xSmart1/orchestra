@@ -1,8 +1,10 @@
+import { RunStatusValue } from '../constants';
+
 export interface Run {
   id: string;
   taskId: string;
   modelProfileId: string | null;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: RunStatusValue;
   tokensIn: number;
   tokensOut: number;
   costUsd: number;
@@ -20,6 +22,15 @@ export interface Artifact {
   path: string;
   description: string;
   createdAt: Date;
+}
+
+export interface WorkerOutput {
+  summary: string;
+  filesTouched: string[];
+  commandsRun: string[];
+  resultEvidence: string;
+  openRisks: string[];
+  followUpRecommendation: string | null;
 }
 
 export interface ApprovalRequest {

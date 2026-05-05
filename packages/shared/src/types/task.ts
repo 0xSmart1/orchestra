@@ -1,4 +1,4 @@
-import { TaskStatusType } from '../constants';
+import { TaskStatusValue } from '../constants';
 
 export interface TaskContract {
   goal: string;
@@ -18,7 +18,7 @@ export interface Task {
   projectId: string;
   title: string;
   contract: TaskContract | null;
-  status: TaskStatusType;
+  status: TaskStatusValue;
   assigneeId: string | null;
   reviewerId: string | null;
   priority: number;

@@ -16,4 +16,4 @@ export const EventType = {
   COST_THRESHOLD_WARNING: 'cost.threshold.warning',
 } as const;
 
-export type EventTypeType = (typeof EventType)[keyof typeof EventType];
+export type EventTypeName = (typeof EventType)[keyof typeof EventType];

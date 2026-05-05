@@ -10,4 +10,4 @@ export const AgentStatus = {
   DONE: 'done',
 } as const;
 
-export type AgentStatusType = (typeof AgentStatus)[keyof typeof AgentStatus];
+export type AgentStatusValue = (typeof AgentStatus)[keyof typeof AgentStatus];

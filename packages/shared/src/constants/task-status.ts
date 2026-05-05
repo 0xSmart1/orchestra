@@ -8,4 +8,4 @@ export const TaskStatus = {
   REJECTED: 'rejected',
 } as const;
 
-export type TaskStatusType = (typeof TaskStatus)[keyof typeof TaskStatus];
+export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];

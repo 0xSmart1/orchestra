@@ -1,4 +1,4 @@
-import { AgentStatusType } from '../constants';
+import { AgentStatusValue } from '../constants';
 
 export interface AgentTemplate {
   id: string;
@@ -20,7 +20,7 @@ export interface AgentInstance {
   systemPrompt: string;
   promptVersion: number;
   modelProfileId: string | null;
-  status: AgentStatusType;
+  status: AgentStatusValue;
   memoryPath: string | null;
   currentTaskId: string | null;
   createdAt: Date;

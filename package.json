@@ -13,5 +13,8 @@
     "lint": "npm run lint --workspaces",
     "db:migrate": "npm run db:migrate --workspace=@orchestra/backend",
     "db:generate": "npm run db:generate --workspace=@orchestra/backend"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }

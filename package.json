@@ -1,0 +1,16 @@
+{
+  "name": "orchestra",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:backend": "npm run dev --workspace=@orchestra/backend",
+    "dev:frontend": "npm run dev --workspace=@orchestra/frontend",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "db:migrate": "npm run db:migrate --workspace=@orchestra/backend",
+    "db:generate": "npm run db:generate --workspace=@orchestra/backend"
+  }
+}

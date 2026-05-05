@@ -1,3 +1,7 @@
+// Standalone config — does NOT extend tsconfig.base.json because
+// NestJS requires module:"commonjs" + moduleResolution:"node",
+// which conflicts with the base's moduleResolution:"bundler".
+// Keep this in sync with base options when updating shared settings.
 {
   "compilerOptions": {
     "target": "ES2022",

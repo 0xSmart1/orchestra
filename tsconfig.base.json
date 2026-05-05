@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
     "moduleResolution": "node",
     "declaration": true,
     "strict": true,
@@ -9,8 +8,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
       "@orchestra/shared": ["packages/shared/src"],

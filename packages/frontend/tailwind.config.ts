@@ -5,25 +5,28 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        surface: { DEFAULT: '#111118', hover: '#1a1a24' },
-        border: { DEFAULT: '#2a2a3a', bright: '#3a3a5a' },
-        accent: {
-          cyan: '#00e5ff',
-          green: '#39ff14',
-          magenta: '#ff0080',
-          amber: '#ffaa00',
-          purple: '#b366ff',
+        surface: {
+          900: '#0a0a0f',
+          800: '#12121a',
+          700: '#1a1a2e',
         },
-        txt: { primary: '#e8e8ef', secondary: '#6a6a80' },
+        border: {
+          600: '#2a2a3a',
+          500: '#3a3a4a',
+          400: '#4a4a5a',
+        },
+        'accent-cyan': '#00e5ff',
+        'accent-green': '#39ff14',
+        'accent-magenta': '#ff0080',
+        'accent-amber': '#ffaa00',
+        'accent-purple': '#b366ff',
+        txt: {
+          primary: '#e0e0e0',
+          secondary: '#888888',
+        },
       },
       fontFamily: {
-        mono: [
-          'JetBrains Mono',
-          'Fira Code',
-          'Cascadia Code',
-          'SF Mono',
-          'monospace',
-        ],
+        mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'monospace'],
       },
       borderRadius: {
         pixel: '2px',

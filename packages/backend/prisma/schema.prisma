@@ -220,8 +220,10 @@ model MemoryDocument {
   id          String   @id @default(cuid())
   projectId   String
   agentId     String?
+  title       String   @default("")
   type        String
-  filePath    String
+  content     String   @default("")
+  filePath    String   @default("")
   version     Int      @default(1)
   lastSummary String?
   createdAt   DateTime @default(now())

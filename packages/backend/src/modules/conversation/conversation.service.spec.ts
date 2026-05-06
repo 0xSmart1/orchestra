@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ConversationService } from './conversation.service';
 import { PrismaService } from '../../prisma.service';
+import { LlmClientService } from '../model-gateway/llm-client.service';
 
 describe('ConversationService', () => {
   let service: ConversationService;
@@ -16,6 +17,12 @@ describe('ConversationService', () => {
       create: jest.Mock;
       findMany: jest.Mock;
     };
+    project: {
+      findUnique: jest.Mock;
+    };
+  };
+  let llmClient: {
+    chat: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -31,12 +38,20 @@ describe('ConversationService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
       },
+      project: {
+        findUnique: jest.fn(),
+      },
+    };
+
+    llmClient = {
+      chat: jest.fn(),
     };
 
     const module = await Test.createTestingModule({
       providers: [
         ConversationService,
         { provide: PrismaService, useValue: prisma },
+        { provide: LlmClientService, useValue: llmClient },
       ],
     }).compile();
 
@@ -127,41 +142,108 @@ describe('ConversationService', () => {
     });
   });
 
-  it('orchestratorRespond saves user message then orchestrator message', async () => {
-    const userMessage = { id: 'msg1', conversationId: 'clx1', role: 'user', content: 'Do something' };
-    const orchestratorMessage = {
-      id: 'msg2',
-      conversationId: 'clx1',
-      role: 'orchestrator',
-      content: '[Orchestrator] Received: "Do something". I\'ll analyze this and coordinate the team accordingly.',
-    };
-
-    prisma.conversationMessage.create
-      .mockResolvedValueOnce(userMessage)
-      .mockResolvedValueOnce(orchestratorMessage);
-    prisma.conversation.update.mockResolvedValue({} as any);
-
-    const result = await service.orchestratorRespond('clx1', 'Do something', 'p1');
-
-    expect(prisma.conversationMessage.create).toHaveBeenCalledTimes(2);
-    expect(prisma.conversationMessage.create).toHaveBeenNthCalledWith(1, {
-      data: {
-        conversation: { connect: { id: 'clx1' } },
-        role: 'user',
-        content: 'Do something',
-      },
-    });
-    expect(prisma.conversationMessage.create).toHaveBeenNthCalledWith(2, {
-      data: {
-        conversation: { connect: { id: 'clx1' } },
+  describe('orchestratorRespond', () => {
+    it('falls back to stub when no model profile is configured', async () => {
+      const userMessage = { id: 'msg1', conversationId: 'clx1', role: 'user', content: 'Do something' };
+      const orchestratorMessage = {
+        id: 'msg2',
+        conversationId: 'clx1',
         role: 'orchestrator',
-        content: '[Orchestrator] Received: "Do something". I\'ll analyze this and coordinate the team accordingly.',
-      },
+        content: '',
+      };
+
+      // No default model profile on project
+      prisma.project.findUnique.mockResolvedValue({ defaultModelProfileId: null });
+      prisma.conversationMessage.create
+        .mockResolvedValueOnce(userMessage)
+        .mockResolvedValueOnce(orchestratorMessage);
+      prisma.conversation.update.mockResolvedValue({} as any);
+
+      const result = await service.orchestratorRespond('clx1', 'Do something', 'p1');
+
+      expect(prisma.conversationMessage.create).toHaveBeenCalledTimes(2);
+      expect(prisma.conversationMessage.create).toHaveBeenNthCalledWith(1, {
+        data: {
+          conversation: { connect: { id: 'clx1' } },
+          role: 'user',
+          content: 'Do something',
+        },
+      });
+
+      // Second call should contain the stub message
+      const secondCallData = prisma.conversationMessage.create.mock.calls[1][0];
+      expect(secondCallData.data.role).toBe('orchestrator');
+      expect(secondCallData.data.content).toContain('No model profile configured');
+
+      expect(llmClient.chat).not.toHaveBeenCalled();
+      expect(result.role).toBe('orchestrator');
     });
-    expect(prisma.conversation.update).toHaveBeenCalledWith({
-      where: { id: 'clx1' },
-      data: { updatedAt: expect.any(Date) },
+
+    it('calls LLM when model profile is configured', async () => {
+      const userMessage = { id: 'msg1', conversationId: 'clx1', role: 'user', content: 'Do something' };
+      const orchestratorMessage = {
+        id: 'msg2',
+        conversationId: 'clx1',
+        role: 'orchestrator',
+        content: '',
+      };
+
+      prisma.project.findUnique.mockResolvedValue({ defaultModelProfileId: 'profile1' });
+      prisma.conversationMessage.findMany.mockResolvedValue([
+        { id: 'msg1', role: 'user', content: 'Do something' },
+      ]);
+      llmClient.chat.mockResolvedValue({
+        content: 'I will assign this task to a specialist worker.',
+        tokensIn: 20,
+        tokensOut: 15,
+      });
+      prisma.conversationMessage.create
+        .mockResolvedValueOnce(userMessage)
+        .mockResolvedValueOnce(orchestratorMessage);
+      prisma.conversation.update.mockResolvedValue({} as any);
+
+      const result = await service.orchestratorRespond('clx1', 'Do something', 'p1');
+
+      expect(llmClient.chat).toHaveBeenCalledTimes(1);
+      expect(llmClient.chat).toHaveBeenCalledWith(
+        'profile1',
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'system' }),
+          expect.objectContaining({ role: 'user', content: 'Do something' }),
+        ]),
+      );
+
+      // Second message create should have LLM content
+      const secondCallData = prisma.conversationMessage.create.mock.calls[1][0];
+      expect(secondCallData.data.content).toBe(
+        'I will assign this task to a specialist worker.',
+      );
     });
-    expect(result.role).toBe('orchestrator');
+
+    it('falls back gracefully on LLM error', async () => {
+      const userMessage = { id: 'msg1', conversationId: 'clx1', role: 'user', content: 'Do something' };
+      const orchestratorMessage = {
+        id: 'msg2',
+        conversationId: 'clx1',
+        role: 'orchestrator',
+        content: '',
+      };
+
+      prisma.project.findUnique.mockResolvedValue({ defaultModelProfileId: 'profile1' });
+      prisma.conversationMessage.findMany.mockResolvedValue([
+        { id: 'msg1', role: 'user', content: 'Do something' },
+      ]);
+      llmClient.chat.mockRejectedValue(new Error('API rate limit'));
+      prisma.conversationMessage.create
+        .mockResolvedValueOnce(userMessage)
+        .mockResolvedValueOnce(orchestratorMessage);
+      prisma.conversation.update.mockResolvedValue({} as any);
+
+      const result = await service.orchestratorRespond('clx1', 'Do something', 'p1');
+
+      const secondCallData = prisma.conversationMessage.create.mock.calls[1][0];
+      expect(secondCallData.data.content).toContain('LLM Error');
+      expect(secondCallData.data.content).toContain('API rate limit');
+    });
   });
 });

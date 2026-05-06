@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { Header } from '@/components/layout/header';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useProject } from '@/lib/project-context';
 
 interface AgentTemplate {
@@ -25,6 +25,8 @@ export default function AgentsPage() {
   const { projectId } = useProject();
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showInstanceForm, setShowInstanceForm] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [instanceName, setInstanceName] = useState('');
   const qc = useQueryClient();
 
   const { data: templates = [] } = useQuery({
@@ -36,6 +38,11 @@ export default function AgentsPage() {
     queryKey: ['agent-instances', projectId],
     queryFn: () => apiFetch<AgentInstance[]>(`/agents/instances?projectId=${projectId || ''}`),
   });
+
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => t.id === selectedTemplateId),
+    [templates, selectedTemplateId],
+  );
 
   const createTemplate = useMutation({
     mutationFn: (data: any) => apiFetch('/agents/templates', { method: 'POST', body: JSON.stringify(data) }),
@@ -76,6 +83,51 @@ export default function AgentsPage() {
             <input name="role" placeholder="Role" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" required />
             <textarea name="systemPrompt" placeholder="System prompt" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm h-24" required />
             <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">Create</button>
+          </form>
+        )}
+
+        {showInstanceForm && projectId && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createInstance.mutate({
+                name: instanceName,
+                role: selectedTemplate?.role,
+                systemPrompt: selectedTemplate?.systemPrompt,
+                template: { connect: { id: selectedTemplateId } },
+              });
+            }}
+            className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3"
+          >
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm border border-gray-800"
+              required
+            >
+              <option value="">Select template...</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <input
+              value={instanceName}
+              onChange={(e) => setInstanceName(e.target.value)}
+              placeholder="Instance name"
+              className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm border border-gray-800"
+              required
+            />
+            {selectedTemplate && (
+              <div className="text-xs text-gray-500 space-y-1 border border-gray-800 rounded p-3">
+                <div><span className="text-gray-400">Role:</span> {selectedTemplate.role}</div>
+                <div><span className="text-gray-400">System prompt:</span> {selectedTemplate.systemPrompt}</div>
+              </div>
+            )}
+            <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+              Create
+            </button>
           </form>
         )}
 

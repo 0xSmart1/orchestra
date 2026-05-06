@@ -25,4 +25,8 @@ export class MemoryService {
   update(id: string, data: Prisma.MemoryDocumentUpdateInput) {
     return this.prisma.memoryDocument.update({ where: { id }, data });
   }
+
+  remove(id: string) {
+    return this.prisma.memoryDocument.delete({ where: { id } });
+  }
 }

@@ -1,10 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { LlmClientService, ChatMessage } from '../model-gateway/llm-client.service';
 import { Prisma } from '@prisma/client';
+
+const ORCHESTRATOR_SYSTEM_PROMPT =
+  'You are the Orchestrator agent for an AI team workspace. Your role is to: ' +
+  'understand user intent, break down tasks, coordinate specialist workers, review their output, ' +
+  'and synthesize results. Do NOT perform worker tasks yourself. When the user asks for work to be done, ' +
+  'propose task assignments and team structure. Always ask clarifying questions when intent is ambiguous.';
 
 @Injectable()
 export class ConversationService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ConversationService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private llmClient: LlmClientService,
+  ) {}
 
   create(data: Prisma.ConversationCreateInput) {
     return this.prisma.conversation.create({ data });
@@ -42,7 +54,7 @@ export class ConversationService {
   async orchestratorRespond(
     conversationId: string,
     userMessage: string,
-    _projectId: string,
+    projectId: string,
   ) {
     // Save user message
     await this.addMessage({
@@ -51,14 +63,49 @@ export class ConversationService {
       content: userMessage,
     });
 
-    // Simulate orchestrator thinking and responding
-    // For MVP: just echo back with a structured response
-    const orchestratorResponse = `[Orchestrator] Received: "${userMessage}". I'll analyze this and coordinate the team accordingly.`;
+    // Get project's default model profile
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { defaultModelProfileId: true },
+    });
+
+    let orchestratorContent: string;
+
+    if (project?.defaultModelProfileId) {
+      // Get conversation history for context
+      const history = await this.getMessages(conversationId);
+      const chatMessages: ChatMessage[] = history.map((m) => ({
+        role: m.role === 'orchestrator' ? 'assistant' : (m.role as ChatMessage['role']),
+        content: m.content,
+      }));
+
+      // Prepend system prompt
+      const systemPrompt: ChatMessage = {
+        role: 'system',
+        content: ORCHESTRATOR_SYSTEM_PROMPT,
+      };
+
+      try {
+        const result = await this.llmClient.chat(project.defaultModelProfileId, [
+          systemPrompt,
+          ...chatMessages,
+        ]);
+        orchestratorContent = result.content;
+      } catch (error: any) {
+        this.logger.error(`LLM call failed: ${error.message}`, error.stack);
+        orchestratorContent = `[Orchestrator — LLM Error] ${error.message}. Falling back to stub mode.`;
+      }
+    } else {
+      // No model profile configured — use stub
+      orchestratorContent =
+        `[Orchestrator — Stub] No model profile configured for this project. ` +
+        `Configure one in the Models page. Your message: "${userMessage}"`;
+    }
 
     const message = await this.addMessage({
       conversation: { connect: { id: conversationId } },
       role: 'orchestrator',
-      content: orchestratorResponse,
+      content: orchestratorContent,
     });
 
     // Update conversation updatedAt

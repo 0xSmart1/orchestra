@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { MemoryService } from './memory.service';
 import { Prisma } from '@prisma/client';
 
@@ -30,5 +30,10 @@ export class MemoryController {
   @Put(':id')
   update(@Param('id') id: string, @Body() data: Prisma.MemoryDocumentUpdateInput) {
     return this.memoryService.update(id, data);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.memoryService.remove(id);
   }
 }

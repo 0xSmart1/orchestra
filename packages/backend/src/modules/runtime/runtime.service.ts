@@ -14,6 +14,10 @@ export class RuntimeService {
     return this.prisma.run.findMany({ where: { taskId }, orderBy: { createdAt: 'desc' } });
   }
 
+  findRunById(id: string) {
+    return this.prisma.run.findUnique({ where: { id } });
+  }
+
   updateRun(id: string, data: Prisma.RunUpdateInput) {
     return this.prisma.run.update({ where: { id }, data });
   }

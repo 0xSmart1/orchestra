@@ -25,4 +25,20 @@ export class ModelGatewayService {
   findOneProfile(id: string) {
     return this.prisma.modelProfile.findUnique({ where: { id }, include: { provider: true, fallback: true } });
   }
+
+  updateProvider(id: string, data: Prisma.ModelProviderUpdateInput) {
+    return this.prisma.modelProvider.update({ where: { id }, data });
+  }
+
+  removeProvider(id: string) {
+    return this.prisma.modelProvider.delete({ where: { id } });
+  }
+
+  updateProfile(id: string, data: Prisma.ModelProfileUpdateInput) {
+    return this.prisma.modelProfile.update({ where: { id }, data });
+  }
+
+  removeProfile(id: string) {
+    return this.prisma.modelProfile.delete({ where: { id } });
+  }
 }

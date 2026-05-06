@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Sidebar } from '@/components/layout/sidebar';
+import { QueryProvider } from '@/lib/query-client';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -15,10 +16,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Sidebar />
-        <main className="ml-[var(--sidebar-width)] min-h-screen">
-          {children}
-        </main>
+        <QueryProvider>
+          <Sidebar />
+          <main className="ml-[var(--sidebar-width)] min-h-screen">
+            {children}
+          </main>
+        </QueryProvider>
       </body>
     </html>
   );

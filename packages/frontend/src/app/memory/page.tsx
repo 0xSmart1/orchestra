@@ -37,11 +37,11 @@ const MEMORY_TYPES = [
 ] as const;
 
 const typeBadgeColors: Record<string, string> = {
-  DECISION: 'bg-purple-900 text-purple-300',
-  TASK_LOG: 'bg-blue-900 text-blue-300',
-  PROJECT_MEMORY: 'bg-emerald-900 text-emerald-300',
-  LESSON_LEARNED: 'bg-yellow-900 text-yellow-300',
-  SELF_IMPROVEMENT: 'bg-pink-900 text-pink-300',
+  DECISION: 'bg-accent-purple/20 text-accent-purple border-accent-purple/30',
+  TASK_LOG: 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/30',
+  PROJECT_MEMORY: 'bg-accent-green/20 text-accent-green border-accent-green/30',
+  LESSON_LEARNED: 'bg-accent-amber/20 text-accent-amber border-accent-amber/30',
+  SELF_IMPROVEMENT: 'bg-accent-magenta/20 text-accent-magenta border-accent-magenta/30',
 };
 
 export default function MemoryPage() {
@@ -172,7 +172,7 @@ export default function MemoryPage() {
       <>
         <Header title="Memory" />
         <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
-          <p className="text-gray-500">Select a project first to view memory.</p>
+          <p className="text-txt-secondary font-mono">Select a project first to view memory.</p>
         </div>
       </>
     );
@@ -183,32 +183,32 @@ export default function MemoryPage() {
     return (
       <>
         <Header title="Memory" />
-        <div className="p-6 max-w-4xl">
+        <div className="p-6 max-w-4xl font-mono">
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={handleBack}
-              className="px-2 py-1 text-xs text-gray-400 border border-gray-700 rounded hover:bg-gray-800"
+              className="px-2 py-1 text-xs text-txt-secondary border border-border-600 rounded-sm hover:bg-surface-800 hover:border-accent-cyan"
             >
               Back
             </button>
-            <h2 className="text-sm font-medium text-gray-100 truncate">{selectedDoc.title}</h2>
-            <span className={`px-2 py-0.5 text-[10px] rounded ${typeBadgeColors[selectedDoc.type] || 'bg-gray-700 text-gray-300'}`}>
+            <h2 className="text-sm font-medium text-txt-primary truncate">{selectedDoc.title}</h2>
+            <span className={`px-2 py-0.5 text-[10px] rounded-sm border ${typeBadgeColors[selectedDoc.type] || 'bg-surface-700 text-txt-secondary border-border-600'}`}>
               {selectedDoc.type}
             </span>
-            <span className="text-xs text-gray-600 ml-auto">
+            <span className="text-xs text-txt-secondary ml-auto">
               Updated {new Date(selectedDoc.updatedAt).toLocaleString()}
             </span>
           </div>
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            className="w-full h-[calc(100vh-12rem)] bg-gray-800 text-gray-100 px-4 py-3 rounded-lg text-sm font-mono border border-gray-700 resize-none focus:outline-none focus:border-gray-600"
+            className="w-full h-[calc(100vh-12rem)] bg-surface-800 text-txt-primary px-4 py-3 rounded-sm text-sm font-mono border border-border-600 resize-none focus:outline-none focus:border-accent-cyan caret-accent-cyan"
           />
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleSave}
               disabled={updateMutation.isPending || editContent === selectedDoc.content}
-              className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-1.5 bg-accent-cyan text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(0,229,255,0.3)] disabled:opacity-50"
             >
               {updateMutation.isPending ? 'Saving...' : 'Save'}
             </button>
@@ -219,7 +219,7 @@ export default function MemoryPage() {
                 }
               }}
               disabled={deleteMutation.isPending}
-              className="px-4 py-1.5 bg-red-700 text-white text-sm rounded-md hover:bg-red-800 disabled:opacity-50"
+              className="px-4 py-1.5 bg-accent-magenta text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(255,0,128,0.3)] disabled:opacity-50"
             >
               Delete
             </button>
@@ -232,18 +232,18 @@ export default function MemoryPage() {
   return (
     <>
       <Header title="Memory" />
-      <div className="p-6">
+      <div className="p-6 font-mono">
         {/* --- Tabs --- */}
-        <div className="flex gap-1 mb-5 border-b border-gray-800">
+        <div className="flex gap-1 mb-5 border-b border-border-600">
           <button
             onClick={() => { setActiveTab('project'); setSelectedDocId(null); }}
-            className={`px-4 py-2 text-sm rounded-t-md ${activeTab === 'project' ? 'bg-gray-800 text-gray-100' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`px-4 py-2 text-sm rounded-t-sm transition-colors ${activeTab === 'project' ? 'bg-surface-800 text-accent-cyan border-b-2 border-b-accent-cyan' : 'text-txt-secondary hover:text-txt-primary'}`}
           >
             Project Memory
           </button>
           <button
             onClick={() => { setActiveTab('agent'); setSelectedDocId(null); }}
-            className={`px-4 py-2 text-sm rounded-t-md ${activeTab === 'agent' ? 'bg-gray-800 text-gray-100' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`px-4 py-2 text-sm rounded-t-sm transition-colors ${activeTab === 'agent' ? 'bg-surface-800 text-accent-cyan border-b-2 border-b-accent-cyan' : 'text-txt-secondary hover:text-txt-primary'}`}
           >
             Agent Memory
           </button>
@@ -255,7 +255,7 @@ export default function MemoryPage() {
             <select
               value={selectedAgentId}
               onChange={(e) => { setSelectedAgentId(e.target.value); setSelectedDocId(null); }}
-              className="bg-gray-800 text-gray-100 border border-gray-700 rounded px-3 py-2 text-sm"
+              className="bg-surface-800 text-txt-primary border border-border-600 rounded-sm px-3 py-2 text-sm focus:border-accent-cyan focus:outline-none"
             >
               <option value="">Select an agent instance</option>
               {agentInstances.map((a) => (
@@ -269,29 +269,29 @@ export default function MemoryPage() {
 
         {/* --- New Document button --- */}
         <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-gray-400">{currentDocs.length} document(s)</p>
+          <p className="text-sm text-txt-secondary">{currentDocs.length} document(s)</p>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
             disabled={activeTab === 'agent' && !selectedAgentId}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="px-3 py-1.5 bg-accent-cyan text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(0,229,255,0.3)] disabled:opacity-50"
           >
-            New Document
+            + New Document
           </button>
         </div>
 
         {/* --- Create form --- */}
         {showCreateForm && (
-          <div className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3">
+          <div className="mb-6 p-4 border border-border-600 rounded-sm space-y-3 bg-surface-900">
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Document title"
-              className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm border border-gray-700"
+              className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none"
             />
             <select
               value={newType}
               onChange={(e) => setNewType(e.target.value)}
-              className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm border border-gray-700"
+              className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none"
             >
               {MEMORY_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -301,19 +301,19 @@ export default function MemoryPage() {
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
               placeholder="Document content (markdown)"
-              className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm border border-gray-700 h-32 font-mono"
+              className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 h-32 font-mono focus:border-accent-cyan focus:outline-none caret-accent-cyan"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleCreate}
                 disabled={!newTitle.trim() || !newContent.trim() || createMutation.isPending}
-                className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                className="px-3 py-1.5 bg-accent-green text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(57,255,20,0.3)] disabled:opacity-50"
               >
                 {createMutation.isPending ? 'Creating...' : 'Create'}
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="px-3 py-1.5 text-gray-400 text-sm border border-gray-700 rounded hover:bg-gray-800"
+                className="px-3 py-1.5 text-txt-secondary text-sm border border-border-600 rounded-sm hover:bg-surface-800"
               >
                 Cancel
               </button>
@@ -323,26 +323,31 @@ export default function MemoryPage() {
 
         {/* --- Document list --- */}
         {activeTab === 'agent' && !selectedAgentId ? (
-          <p className="text-gray-600 text-center text-sm py-8">Select an agent instance to view its memory.</p>
+          <p className="text-txt-secondary text-center text-sm py-8">Select an agent instance to view its memory.</p>
         ) : currentDocs.length === 0 ? (
-          <p className="text-gray-600 text-center text-sm py-8">No memory documents yet.</p>
+          <p className="text-txt-secondary text-center text-sm py-8">No memory documents yet.</p>
         ) : (
           <div className="space-y-2">
             {currentDocs.map((doc) => (
               <button
                 key={doc.id}
                 onClick={() => handleSelectDoc(doc)}
-                className="w-full text-left p-3 border border-gray-800 rounded-lg hover:bg-gray-800 transition-colors"
+                className="w-full text-left p-3 border border-border-600 rounded-sm bg-surface-900 hover:bg-surface-800 hover:border-accent-cyan transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-gray-100">{doc.title}</span>
-                  <span className={`px-2 py-0.5 text-[10px] rounded ${typeBadgeColors[doc.type] || 'bg-gray-700 text-gray-300'}`}>
+                  <span className="font-medium text-sm text-txt-primary">{doc.title}</span>
+                  <span className={`px-2 py-0.5 text-[10px] rounded-sm border ${typeBadgeColors[doc.type] || 'bg-surface-700 text-txt-secondary border-border-600'}`}>
                     {doc.type}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-txt-secondary mt-1 font-mono">
                   Updated {new Date(doc.updatedAt).toLocaleString()}
                 </div>
+                {doc.content && (
+                  <div className="text-xs text-txt-secondary mt-1 font-mono truncate opacity-60">
+                    {doc.content.slice(0, 120)}...
+                  </div>
+                )}
               </button>
             ))}
           </div>

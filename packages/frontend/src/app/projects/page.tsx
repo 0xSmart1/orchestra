@@ -35,14 +35,14 @@ export default function ProjectsPage() {
   return (
     <>
       <Header title="Projects" />
-      <div className="p-6">
+      <div className="p-6 font-mono">
         <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-gray-400">{projects.length} project(s)</p>
+          <p className="text-sm text-txt-secondary">{projects.length} project(s)</p>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+            className="px-3 py-1.5 bg-accent-cyan text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(0,229,255,0.3)]"
           >
-            New Project
+            + New Project
           </button>
         </div>
 
@@ -57,33 +57,33 @@ export default function ProjectsPage() {
                 workspacePath: fd.get('workspacePath'),
               });
             }}
-            className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3"
+            className="mb-6 p-4 border border-border-600 rounded-sm space-y-3 bg-surface-900"
           >
-            <input name="name" placeholder="Project name" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" required />
-            <input name="description" placeholder="Description" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" />
-            <input name="workspacePath" placeholder="Workspace path" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" required />
-            <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">Create</button>
+            <input name="name" placeholder="Project name" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none" required />
+            <input name="description" placeholder="Description" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none" />
+            <input name="workspacePath" placeholder="Workspace path" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none" required />
+            <button type="submit" className="px-3 py-1.5 bg-accent-green text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(57,255,20,0.3)]">Create</button>
           </form>
         )}
 
         <div className="space-y-2">
           {projects.map((p) => (
-            <div key={p.id} className="p-4 border border-gray-800 rounded-lg flex justify-between items-center">
+            <div key={p.id} className="p-4 border border-border-600 rounded-sm bg-surface-900 flex justify-between items-center hover:border-accent-cyan transition-colors">
               <div>
-                <h3 className="font-medium">{p.name}</h3>
-                <p className="text-xs text-gray-500">{p.workspacePath}</p>
-                {p.description && <p className="text-xs text-gray-400 mt-1">{p.description}</p>}
+                <h3 className="font-medium text-txt-primary">{p.name}</h3>
+                <p className="text-xs text-txt-secondary">{p.workspacePath}</p>
+                {p.description && <p className="text-xs text-txt-secondary mt-1 opacity-80">{p.description}</p>}
               </div>
               <button
                 onClick={() => deleteMutation.mutate(p.id)}
-                className="px-2 py-1 text-xs text-red-400 hover:text-red-300 border border-red-900 rounded"
+                className="px-2 py-1 text-xs text-accent-magenta border border-accent-magenta/30 rounded-sm hover:bg-accent-magenta/10"
               >
                 Delete
               </button>
             </div>
           ))}
           {projects.length === 0 && !showForm && (
-            <p className="text-gray-600 text-center py-8">No projects yet. Create one to get started.</p>
+            <p className="text-txt-secondary text-center py-8">No projects yet. Create one to get started.</p>
           )}
         </div>
       </div>

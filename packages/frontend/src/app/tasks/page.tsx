@@ -28,12 +28,12 @@ interface AgentInstance {
 }
 
 const COLUMNS = [
-  { key: 'backlog', label: 'Backlog', color: 'border-gray-600' },
-  { key: 'planned', label: 'Planned', color: 'border-blue-600' },
-  { key: 'in_progress', label: 'In Progress', color: 'border-yellow-600' },
-  { key: 'in_review', label: 'In Review', color: 'border-purple-600' },
-  { key: 'done', label: 'Done', color: 'border-green-600' },
-  { key: 'cancelled', label: 'Cancelled', color: 'border-red-600' },
+  { key: 'backlog', label: 'Backlog', color: 'border-txt-secondary', headerColor: 'text-txt-secondary' },
+  { key: 'planned', label: 'Planned', color: 'border-accent-cyan', headerColor: 'text-accent-cyan' },
+  { key: 'in_progress', label: 'In Progress', color: 'border-accent-amber', headerColor: 'text-accent-amber' },
+  { key: 'in_review', label: 'In Review', color: 'border-accent-purple', headerColor: 'text-accent-purple' },
+  { key: 'done', label: 'Done', color: 'border-accent-green', headerColor: 'text-accent-green' },
+  { key: 'cancelled', label: 'Cancelled', color: 'border-accent-magenta', headerColor: 'text-accent-magenta' },
 ];
 
 const TRANSITIONS: Record<string, string[]> = {
@@ -46,10 +46,19 @@ const TRANSITIONS: Record<string, string[]> = {
 };
 
 const priorityDots: Record<number, string> = {
-  0: 'bg-gray-500',
-  1: 'bg-blue-500',
-  2: 'bg-yellow-500',
-  3: 'bg-red-500',
+  0: 'bg-txt-secondary',
+  1: 'bg-accent-cyan',
+  2: 'bg-accent-amber',
+  3: 'bg-accent-magenta',
+};
+
+const transitionBtnColors: Record<string, string> = {
+  backlog: 'text-txt-secondary border-border-600 hover:bg-surface-700',
+  planned: 'text-accent-cyan border-accent-cyan/30 hover:bg-accent-cyan/10',
+  in_progress: 'text-accent-amber border-accent-amber/30 hover:bg-accent-amber/10',
+  in_review: 'text-accent-purple border-accent-purple/30 hover:bg-accent-purple/10',
+  done: 'text-accent-green border-accent-green/30 hover:bg-accent-green/10',
+  cancelled: 'text-accent-magenta border-accent-magenta/30 hover:bg-accent-magenta/10',
 };
 
 export default function TasksPage() {
@@ -98,7 +107,7 @@ export default function TasksPage() {
       <>
         <Header title="Tasks" />
         <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
-          <p className="text-gray-500">Select a project first to view tasks.</p>
+          <p className="text-txt-secondary font-mono">Select a project first to view tasks.</p>
         </div>
       </>
     );
@@ -107,10 +116,10 @@ export default function TasksPage() {
   return (
     <>
       <Header title="Tasks" />
-      <div className="p-6">
+      <div className="p-6 font-mono">
         <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-gray-400">{tasks.length} task(s)</p>
-          <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">New Task</button>
+          <p className="text-sm text-txt-secondary">{tasks.length} task(s)</p>
+          <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 bg-accent-cyan text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(0,229,255,0.3)]">+ New Task</button>
         </div>
 
         {showForm && (
@@ -124,49 +133,49 @@ export default function TasksPage() {
               assignee: fd.get('assigneeId') ? { connect: { id: fd.get('assigneeId') } } : undefined,
               project: { connect: { id: projectId } },
             });
-          }} className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3">
-            <input name="title" placeholder="Task title" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" required />
-            <textarea name="contract" placeholder="Task contract (optional)" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm h-20" />
+          }} className="mb-6 p-4 border border-border-600 rounded-sm space-y-3 bg-surface-900">
+            <input name="title" placeholder="Task title" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none" required />
+            <textarea name="contract" placeholder="Task contract (optional)" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm h-20 border border-border-600 focus:border-accent-cyan focus:outline-none" />
             <div className="flex gap-2">
-              <select name="priority" className="bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm">
+              <select name="priority" className="bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none">
                 <option value="0">Priority: None</option>
                 <option value="1">Priority: Low</option>
                 <option value="2">Priority: Medium</option>
                 <option value="3">Priority: High</option>
               </select>
-              <select name="assigneeId" className="flex-1 bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm">
+              <select name="assigneeId" className="flex-1 bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none">
                 <option value="">Unassigned</option>
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.role})</option>)}
               </select>
             </div>
-            <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">Create</button>
+            <button type="submit" className="px-3 py-1.5 bg-accent-green text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(57,255,20,0.3)]">Create</button>
           </form>
         )}
 
         <div className="flex gap-3 overflow-x-auto pb-4">
           {tasksByStatus.map((col) => (
             <div key={col.key} className="min-w-[220px] flex-shrink-0">
-              <h3 className="text-xs font-medium text-gray-500 mb-2 sticky top-0 bg-gray-900 py-1">
-                {col.label} <span className="text-gray-600">({col.tasks.length})</span>
+              <h3 className={`text-xs font-medium mb-2 sticky top-0 bg-surface-900 py-1 ${col.headerColor}`}>
+                {col.label} <span className="text-txt-secondary">({col.tasks.length})</span>
               </h3>
               <div className="space-y-2">
                 {col.tasks.map((t) => (
                   <div
                     key={t.id}
-                    className={`border-l-2 ${col.color} bg-gray-900 p-3 rounded-r-lg cursor-pointer hover:bg-gray-800 transition-colors`}
+                    className={`border-l-2 ${col.color} bg-surface-900 p-3 rounded-r-sm cursor-pointer hover:bg-surface-800 transition-colors border-t border-r border-b border-border-600`}
                     onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${priorityDots[t.priority] || 'bg-gray-500'}`} />
-                      <span className="text-sm font-medium truncate">{t.title}</span>
+                      <span className={`w-2 h-2 rounded-full ${priorityDots[t.priority] || 'bg-txt-secondary'}`} />
+                      <span className="text-sm font-medium truncate text-txt-primary">{t.title}</span>
                     </div>
                     {t.assigneeId && (
-                      <div className="text-xs text-gray-500 mt-1">{agentMap[t.assigneeId] || t.assigneeId}</div>
+                      <div className="text-xs text-txt-secondary mt-1">{agentMap[t.assigneeId] || t.assigneeId}</div>
                     )}
 
                     {expandedId === t.id && (
-                      <div className="mt-2 pt-2 border-t border-gray-800 space-y-2">
-                        {t.contract && <p className="text-xs text-gray-400">{t.contract}</p>}
+                      <div className="mt-2 pt-2 border-t border-border-600 space-y-2">
+                        {t.contract && <p className="text-xs text-txt-secondary">{t.contract}</p>}
                         <select
                           value={t.assigneeId || ''}
                           onChange={(e) => {
@@ -177,15 +186,15 @@ export default function TasksPage() {
                             });
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full bg-gray-800 text-gray-100 px-2 py-1 rounded text-xs"
+                          className="w-full bg-surface-800 text-txt-primary px-2 py-1 rounded-sm text-xs border border-border-600 focus:border-accent-cyan focus:outline-none"
                         >
                           <option value="">Unassigned</option>
                           {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
-                        <div className="text-[10px] text-gray-600">Updated {new Date(t.updatedAt).toLocaleString()}</div>
+                        <div className="text-[10px] text-txt-secondary">Updated {new Date(t.updatedAt).toLocaleString()}</div>
                         <button
                           onClick={(e) => { e.stopPropagation(); if (confirm('Delete?')) deleteTask.mutate(t.id); }}
-                          className="px-2 py-0.5 text-[10px] text-red-400 border border-gray-700 rounded hover:bg-red-900"
+                          className="px-2 py-0.5 text-[10px] text-accent-magenta border border-accent-magenta/30 rounded-sm hover:bg-accent-magenta/10"
                         >Delete</button>
                       </div>
                     )}
@@ -197,8 +206,8 @@ export default function TasksPage() {
                           <button
                             key={next}
                             onClick={(e) => { e.stopPropagation(); updateTask.mutate({ id: t.id, status: next }); }}
-                            className="px-1.5 py-0.5 text-[10px] text-gray-400 border border-gray-700 rounded hover:bg-gray-700"
-                          >→ {colDef?.label || next}</button>
+                            className={`px-1.5 py-0.5 text-[10px] border rounded-sm ${transitionBtnColors[next] || 'text-txt-secondary border-border-600 hover:bg-surface-700'}`}
+                          >{colDef?.label || next}</button>
                         );
                       })}
                     </div>

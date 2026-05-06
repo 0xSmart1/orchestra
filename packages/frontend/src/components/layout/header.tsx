@@ -8,11 +8,13 @@ export function Header({ title }: { title: string }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -23,31 +25,26 @@ export function Header({ title }: { title: string }) {
   const currentProject = projects.find((p) => p.id === projectId);
 
   return (
-    <header className="h-14 border-b border-gray-800 bg-gray-900 flex items-center px-6 gap-4">
-      <h2 className="text-sm font-medium">{title}</h2>
-
-      {/* Project selector */}
+    <header className="h-11 border-b border-border bg-surface flex items-center px-4 gap-3">
+      <h2 className="text-xs font-bold tracking-wider text-accent-cyan uppercase">
+        {title}
+      </h2>
       <div className="ml-auto relative" ref={dropdownRef}>
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 hover:bg-gray-700 transition-colors"
+          className="flex items-center gap-2 px-2 py-1 bg-surface-hover border border-border text-[11px] text-txt-primary hover:border-border-bright transition-colors"
         >
-          <span className="text-gray-500">&#9678;</span>
-          {loading ? (
-            'Loading...'
-          ) : currentProject ? (
-            currentProject.name
-          ) : (
-            'No project'
-          )}
-          <span className="text-gray-500 ml-1">&#9662;</span>
+          <span className="text-accent-cyan">&#9673;</span>
+          <span>
+            {loading ? '...' : currentProject ? currentProject.name : 'NO PROJECT'}
+          </span>
+          <span className="text-txt-secondary">&#9662;</span>
         </button>
-
         {open && (
-          <div className="absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-gray-700 rounded shadow-lg z-50">
+          <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-border z-50">
             {projects.length === 0 && (
-              <div className="px-3 py-2 text-xs text-gray-500">
-                No projects. Create one in Projects.
+              <div className="px-3 py-2 text-[11px] text-txt-secondary">
+                No projects
               </div>
             )}
             {projects.map((p) => (
@@ -57,8 +54,10 @@ export function Header({ title }: { title: string }) {
                   setSelectedProjectId(p.id);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-700 transition-colors ${
-                  p.id === projectId ? 'text-blue-400' : 'text-gray-300'
+                className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-hover transition-colors ${
+                  p.id === projectId
+                    ? 'text-accent-cyan bg-surface-hover'
+                    : 'text-txt-secondary'
                 }`}
               >
                 {p.name}

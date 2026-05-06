@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { Application, Container, Graphics, Text } from 'pixi.js';
+import { useProject } from '@/lib/project-context';
 
 interface AgentData {
   id: string;
@@ -36,6 +37,7 @@ const GRID_PADDING = 40;
 const LABEL_OFFSET = 20;
 
 export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: AgentData) => void }) {
+  const { projectId } = useProject();
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
   const spritesRef = useRef<Map<string, AgentSprite>>(new Map());
@@ -164,31 +166,35 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
     canvasRef.current.appendChild(app.view as unknown as Node);
 
     // Load initial agents from REST endpoint
-    fetch('http://localhost:3001/agents/instances?projectId=')
-      .then((r) => r.json())
-      .then((agents: AgentData[]) => {
-        if (Array.isArray(agents) && agents.length > 0) {
-          setAgents(agents);
-        }
-      })
-      .catch(() => {
-        // Backend not running -- canvas stays empty until SSE connects
-      });
+    if (projectId) {
+      fetch(`http://localhost:3001/agents/instances?projectId=${projectId}`)
+        .then((r) => r.json())
+        .then((agents: AgentData[]) => {
+          if (Array.isArray(agents) && agents.length > 0) {
+            setAgents(agents);
+          }
+        })
+        .catch(() => {
+          // Backend not running -- canvas stays empty until SSE connects
+        });
+    }
 
     // Connect SSE for real-time status updates
-    const es = new EventSource('http://localhost:3001/events/stream?projectId=');
-    es.onmessage = (msg) => {
-      try {
-        const event = JSON.parse(msg.data);
-        if (event.type === 'agent.status.changed' && event.agentId) {
-          const payload = JSON.parse(event.payload ?? '{}');
-          updateAgentStatus(event.agentId, payload.status ?? 'idle');
+    if (projectId) {
+      const es = new EventSource(`http://localhost:3001/events/stream?projectId=${projectId}`);
+      es.onmessage = (msg) => {
+        try {
+          const event = JSON.parse(msg.data);
+          if (event.type === 'agent.status.changed' && event.agentId) {
+            const payload = JSON.parse(event.payload ?? '{}');
+            updateAgentStatus(event.agentId, payload.status ?? 'idle');
+          }
+        } catch {
+          // Ignore malformed events
         }
-      } catch {
-        // Ignore malformed events
-      }
-    };
-    sseRef.current = es;
+      };
+      sseRef.current = es;
+    }
 
     return () => {
       sseRef.current?.close();
@@ -196,7 +202,7 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
       app.destroy(true);
       appRef.current = null;
     };
-  }, [setAgents, updateAgentStatus]);
+  }, [projectId, setAgents, updateAgentStatus]);
 
   return (
     <div

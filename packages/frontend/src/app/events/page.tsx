@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { Header } from '@/components/layout/header';
 import { useEffect, useRef, useState } from 'react';
 import { createEventSource } from '@/lib/sse';
+import { useProject } from '@/lib/project-context';
 
 interface Event {
   id: string;
@@ -17,14 +18,24 @@ interface Event {
 }
 
 export default function EventsPage() {
+  const { projectId } = useProject();
   const [liveEvents, setLiveEvents] = useState<Event[]>([]);
   const [filter, setFilter] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: initialEvents = [] } = useQuery({
-    queryKey: ['events'],
-    queryFn: () => apiFetch<Event[]>('/events?projectId=&limit=50'),
+    queryKey: ['events', projectId],
+    queryFn: () => apiFetch<Event[]>(`/events?projectId=${projectId || ''}&limit=50`),
   });
+
+  // SSE: connect when projectId is available
+  useEffect(() => {
+    if (!projectId) return;
+    const es = createEventSource(projectId, (event) =>
+      setLiveEvents((prev) => [...prev, event]),
+    );
+    return () => es.close();
+  }, [projectId]);
 
   const allEvents = [...initialEvents, ...liveEvents].filter(
     (e) => !filter || e.type.includes(filter)

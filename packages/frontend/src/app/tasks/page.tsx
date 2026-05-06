@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { Header } from '@/components/layout/header';
 import { useState } from 'react';
+import { useProject } from '@/lib/project-context';
 
 interface Task {
   id: string;
@@ -23,17 +24,18 @@ const COLUMNS = [
 ];
 
 export default function TasksPage() {
+  const { projectId } = useProject();
   const [showForm, setShowForm] = useState(false);
   const qc = useQueryClient();
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks'],
-    queryFn: () => apiFetch<Task[]>('/tasks?projectId='),
+    queryKey: ['tasks', projectId],
+    queryFn: () => apiFetch<Task[]>(`/tasks?projectId=${projectId || ''}`),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiFetch('/tasks', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); setShowForm(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks', projectId] }); setShowForm(false); },
   });
 
   const statusMutation = useMutation({
@@ -62,11 +64,13 @@ export default function TasksPage() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-4">
           <p className="text-sm text-gray-400">{tasks.length} task(s)</p>
-          <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">New Task</button>
+          {projectId && (
+            <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">New Task</button>
+          )}
         </div>
 
-        {showForm && (
-          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createMutation.mutate({ title: fd.get('title'), project: { connect: { id: 'default' } } }); }} className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3">
+        {showForm && projectId && (
+          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createMutation.mutate({ title: fd.get('title'), project: { connect: { id: projectId } } }); }} className="mb-6 p-4 border border-gray-800 rounded-lg space-y-3">
             <input name="title" placeholder="Task title" className="w-full bg-gray-800 text-gray-100 px-3 py-2 rounded text-sm" required />
             <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">Create</button>
           </form>

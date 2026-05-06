@@ -7,6 +7,7 @@ import { RuntimeModule } from './modules/runtime/runtime.module';
 import { ToolGatewayModule } from './modules/tool-gateway/tool-gateway.module';
 import { MemoryModule } from './modules/memory/memory.module';
 import { EventModule } from './modules/event/event.module';
+import { ConversationModule } from './modules/conversation/conversation.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { EventModule } from './modules/event/event.module';
     ToolGatewayModule,
     MemoryModule,
     EventModule,
+    ConversationModule,
   ],
 })
 export class AppModule {}

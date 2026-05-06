@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { Header } from '@/components/layout/header';
 import { useState } from 'react';
+import { useProject } from '@/lib/project-context';
 
 interface AgentTemplate {
   id: string;
@@ -21,6 +22,7 @@ interface AgentInstance {
 }
 
 export default function AgentsPage() {
+  const { projectId } = useProject();
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showInstanceForm, setShowInstanceForm] = useState(false);
   const qc = useQueryClient();
@@ -31,8 +33,8 @@ export default function AgentsPage() {
   });
 
   const { data: instances = [] } = useQuery({
-    queryKey: ['agent-instances'],
-    queryFn: () => apiFetch<AgentInstance[]>('/agents/instances?projectId='),
+    queryKey: ['agent-instances', projectId],
+    queryFn: () => apiFetch<AgentInstance[]>(`/agents/instances?projectId=${projectId || ''}`),
   });
 
   const createTemplate = useMutation({
@@ -41,8 +43,12 @@ export default function AgentsPage() {
   });
 
   const createInstance = useMutation({
-    mutationFn: (data: any) => apiFetch('/agents/instances', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agent-instances'] }); setShowInstanceForm(false); },
+    mutationFn: (data: any) =>
+      apiFetch('/agents/instances', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, projectId }),
+      }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agent-instances', projectId] }); setShowInstanceForm(false); },
   });
 
   const statusColors: Record<string, string> = {

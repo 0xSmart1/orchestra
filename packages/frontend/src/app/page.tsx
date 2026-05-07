@@ -272,14 +272,18 @@ function StatCard({ label, value, accent, glowColor }: StatCardProps) {
         relative overflow-hidden
         bg-surface-900 border border-border-600 rounded-sm p-4
         font-mono
-        transition-shadow duration-200
-        hover:shadow-[0_0_8px_var(--glow)]
+        transition-all duration-200
+        hover:border-border-400
+        hover:shadow-[0_0_12px_var(--glow)]
       `}
       style={{ '--glow': glowColor } as React.CSSProperties}
     >
-      {/* Top accent line */}
+      {/* Gradient accent bar at top */}
       <div
-        className={`absolute top-0 left-0 right-0 h-[2px] ${accent.replace('text-', 'bg-')}`}
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, ${glowColor.replace('0.3', '1').replace('0.15', '1')}, transparent)`,
+        }}
       />
       <p className="text-[10px] uppercase tracking-widest text-txt-secondary mb-1">
         {label}
@@ -580,10 +584,10 @@ export default function DashboardPage() {
       {/* Section: Pixel Office Grid */}
       <section>
         <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-xs uppercase tracking-widest text-txt-secondary">
-            Pixel Office
+          <h2 className="text-xs uppercase tracking-widest text-accent-cyan text-glow-cyan">
+            ◈ Pixel Office
           </h2>
-          <div className="flex-1 h-[1px] bg-border-600" />
+          <div className="flex-1 h-[1px] divider-glow" />
           <span className="text-[10px] text-txt-secondary">
             {mergedAgents.length} agent{mergedAgents.length !== 1 ? 's' : ''}
           </span>
@@ -616,10 +620,10 @@ export default function DashboardPage() {
       {/* Section: Recent Events */}
       <section>
         <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-xs uppercase tracking-widest text-txt-secondary">
-            Recent Events
+          <h2 className="text-xs uppercase tracking-widest text-accent-amber text-glow-amber">
+            ◉ Recent Events
           </h2>
-          <div className="flex-1 h-[1px] bg-border-600" />
+          <div className="flex-1 h-[1px]" style={{ background: 'linear-gradient(90deg, var(--accent-amber), transparent 80%)' }} />
           <a
             href="/events"
             className="text-[10px] text-accent-cyan hover:underline"

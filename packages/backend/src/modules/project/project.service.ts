@@ -10,12 +10,19 @@ export class ProjectService {
     return this.prisma.project.create({ data });
   }
 
-  findAll() {
-    return this.prisma.project.findMany({ orderBy: { createdAt: 'desc' } });
+  findAll(options: { archived?: boolean } = {}) {
+    return this.prisma.project.findMany({
+      where: { archived: options.archived ?? false },
+      orderBy: { createdAt: 'desc' },
+      include: { defaultModelProfile: { select: { id: true, name: true, modelName: true } } },
+    });
   }
 
   findOne(id: string) {
-    return this.prisma.project.findUnique({ where: { id } });
+    return this.prisma.project.findUnique({
+      where: { id },
+      include: { defaultModelProfile: { select: { id: true, name: true, modelName: true } } },
+    });
   }
 
   update(id: string, data: Prisma.ProjectUpdateInput) {

@@ -26,6 +26,11 @@ export class ModelGatewayController {
     return this.modelGatewayService.removeProvider(id);
   }
 
+  @Get('providers/:id/available-models')
+  listAvailableModels(@Param('id') id: string) {
+    return this.modelGatewayService.listAvailableModels(id);
+  }
+
   @Post('profiles')
   createProfile(@Body() data: Prisma.ModelProfileCreateInput) {
     return this.modelGatewayService.createProfile(data);

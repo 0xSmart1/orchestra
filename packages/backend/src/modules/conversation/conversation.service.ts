@@ -1,13 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { LlmClientService, ChatMessage } from '../model-gateway/llm-client.service';
+import { LlmClientService, ChatMessage, ChatResult } from '../model-gateway/llm-client.service';
 import { Prisma } from '@prisma/client';
+import { ORCHESTRATOR_TOOLS } from './orchestrator-tools';
+import { ToolExecutorService } from './tool-executor.service';
 
 const ORCHESTRATOR_SYSTEM_PROMPT =
   'You are the Orchestrator agent for an AI team workspace. Your role is to: ' +
   'understand user intent, break down tasks, coordinate specialist workers, review their output, ' +
   'and synthesize results. Do NOT perform worker tasks yourself. When the user asks for work to be done, ' +
-  'propose task assignments and team structure. Always ask clarifying questions when intent is ambiguous.';
+  'use your tools to create specialist agents, assign tasks to them, and run workers. ' +
+  'Always ask clarifying questions when intent is ambiguous. ' +
+  'When you create an agent, write a detailed system prompt that defines the agent role, constraints, and expected output format. ' +
+  'When you create a task, write a detailed contract with goal, context, acceptance criteria, and evidence requirements.';
+
+const MAX_REACT_ITERATIONS = 5;
 
 @Injectable()
 export class ConversationService {
@@ -16,15 +23,16 @@ export class ConversationService {
   constructor(
     private prisma: PrismaService,
     private llmClient: LlmClientService,
+    private toolExecutor: ToolExecutorService,
   ) {}
 
   create(data: Prisma.ConversationCreateInput) {
     return this.prisma.conversation.create({ data });
   }
 
-  findByProject(projectId: string) {
+  findByProject(projectId: string, options: { archived?: boolean } = {}) {
     return this.prisma.conversation.findMany({
-      where: { projectId },
+      where: { projectId, archived: options.archived ?? false },
       orderBy: { updatedAt: 'desc' },
     });
   }
@@ -38,6 +46,10 @@ export class ConversationService {
 
   remove(id: string) {
     return this.prisma.conversation.delete({ where: { id } });
+  }
+
+  update(id: string, data: Prisma.ConversationUpdateInput) {
+    return this.prisma.conversation.update({ where: { id }, data });
   }
 
   addMessage(data: Prisma.ConversationMessageCreateInput) {
@@ -69,46 +81,144 @@ export class ConversationService {
       select: { defaultModelProfileId: true },
     });
 
-    let orchestratorContent: string;
-
-    if (project?.defaultModelProfileId) {
-      // Get conversation history for context
-      const history = await this.getMessages(conversationId);
-      const chatMessages: ChatMessage[] = history.map((m) => ({
-        role: m.role === 'orchestrator' ? 'assistant' : (m.role as ChatMessage['role']),
-        content: m.content,
-      }));
-
-      // Prepend system prompt
-      const systemPrompt: ChatMessage = {
-        role: 'system',
-        content: ORCHESTRATOR_SYSTEM_PROMPT,
-      };
-
-      try {
-        const result = await this.llmClient.chat(project.defaultModelProfileId, [
-          systemPrompt,
-          ...chatMessages,
-        ]);
-        orchestratorContent = result.content;
-      } catch (error: any) {
-        this.logger.error(`LLM call failed: ${error.message}`, error.stack);
-        orchestratorContent = `[Orchestrator — LLM Error] ${error.message}. Falling back to stub mode.`;
-      }
-    } else {
+    if (!project?.defaultModelProfileId) {
       // No model profile configured — use stub
-      orchestratorContent =
+      const content =
         `[Orchestrator — Stub] No model profile configured for this project. ` +
         `Configure one in the Models page. Your message: "${userMessage}"`;
+      const message = await this.addMessage({
+        conversation: { connect: { id: conversationId } },
+        role: 'orchestrator',
+        content,
+      });
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+      return message;
     }
 
+    // Get conversation history for context
+    const history = await this.getMessages(conversationId);
+    const chatMessages: ChatMessage[] = history.map((m) => ({
+      role:
+        m.role === 'orchestrator'
+          ? 'assistant'
+          : m.role === 'user'
+            ? 'user'
+            : m.role === 'tool'
+              ? 'tool'
+              : 'user',
+      content: m.content,
+    }));
+
+    // Prepend system prompt
+    chatMessages.unshift({
+      role: 'system',
+      content: ORCHESTRATOR_SYSTEM_PROMPT,
+    });
+
+    // ReAct loop
+    const actions: Array<{ tool: string; args: Record<string, any>; result: string }> = [];
+    let lastResult: ChatResult | null = null;
+
+    for (let i = 0; i < MAX_REACT_ITERATIONS; i++) {
+      let result: ChatResult;
+      try {
+        result = await this.llmClient.chat(
+          project.defaultModelProfileId,
+          chatMessages,
+          ORCHESTRATOR_TOOLS,
+        );
+      } catch (error: any) {
+        const message = await this.addMessage({
+          conversation: { connect: { id: conversationId } },
+          role: 'orchestrator',
+          content: `[LLM Error] ${error.message}`,
+        });
+
+        await this.prisma.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        return message;
+      }
+      lastResult = result;
+
+      if (result.toolCalls.length === 0) {
+        // No tool calls — final response
+        const finalContent = result.content ?? '';
+
+        const message = await this.addMessage({
+          conversation: { connect: { id: conversationId } },
+          role: 'orchestrator',
+          content: finalContent,
+          actions: JSON.stringify(actions),
+        });
+
+        await this.prisma.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        return message;
+      }
+
+      // Process tool calls
+      this.logger.log(
+        `ReAct iteration ${i + 1}: ${result.toolCalls.length} tool call(s) — ${result.toolCalls.map((tc) => tc.function.name).join(', ')}`,
+      );
+
+      // Add assistant message with tool_calls to chat history
+      chatMessages.push({
+        role: 'assistant',
+        content: result.content,
+        toolCalls: result.toolCalls,
+      });
+
+      for (const toolCall of result.toolCalls) {
+        let args: Record<string, any>;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch {
+          args = {};
+          this.logger.warn(`Failed to parse tool call arguments: ${toolCall.function.arguments}`);
+        }
+
+        const execution = await this.toolExecutor.executeTool(
+          toolCall.function.name,
+          args,
+          projectId,
+        );
+
+        actions.push({
+          tool: toolCall.function.name,
+          args,
+          result: execution.result,
+        });
+
+        // Feed tool result back to the LLM
+        chatMessages.push({
+          role: 'tool',
+          content: execution.result,
+          toolCallId: toolCall.id,
+        });
+      }
+      // Loop continues — LLM sees tool results and decides next action
+    }
+
+    // Hit max iterations — save whatever we have
+    this.logger.warn(`ReAct loop hit max iterations (${MAX_REACT_ITERATIONS})`);
+
+    const content = lastResult?.content ?? '(reached maximum planning iterations, here is what I have so far)';
     const message = await this.addMessage({
       conversation: { connect: { id: conversationId } },
       role: 'orchestrator',
-      content: orchestratorContent,
+      content,
+      actions: JSON.stringify(actions),
     });
 
-    // Update conversation updatedAt
     await this.prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },

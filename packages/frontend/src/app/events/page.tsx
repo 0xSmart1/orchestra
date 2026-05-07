@@ -86,8 +86,8 @@ export default function EventsPage() {
             className="bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm w-64 border border-border-600 focus:border-accent-cyan focus:outline-none"
           />
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent-cyan animate-pulse-glow' : 'bg-txt-secondary'}`} />
-            <span className="text-xs text-txt-secondary">{isConnected ? 'LIVE' : 'OFFLINE'}</span>
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent-cyan animate-pixel-pulse' : 'bg-txt-secondary'}`} />
+            <span className={`text-xs ${isConnected ? 'text-accent-cyan text-glow-cyan' : 'text-txt-secondary'}`}>{isConnected ? 'LIVE' : 'OFFLINE'}</span>
           </div>
         </div>
         <div className="space-y-1 max-h-[70vh] overflow-y-auto">

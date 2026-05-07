@@ -6,15 +6,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace=@orchestra/shared && npm run build --workspace=@orchestra/backend && npm run build --workspace=@orchestra/frontend",
     "dev:backend": "npm run dev --workspace=@orchestra/backend",
     "dev:frontend": "npm run dev --workspace=@orchestra/frontend",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "db:migrate": "npm run db:migrate --workspace=@orchestra/backend",
     "db:generate": "npm run db:generate --workspace=@orchestra/backend"
   },
   "devDependencies": {
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }

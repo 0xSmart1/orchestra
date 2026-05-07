@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ConversationService } from './conversation.service';
 import { PrismaService } from '../../prisma.service';
 import { LlmClientService } from '../model-gateway/llm-client.service';
+import { ToolExecutorService } from './tool-executor.service';
 
 describe('ConversationService', () => {
   let service: ConversationService;
@@ -23,6 +24,9 @@ describe('ConversationService', () => {
   };
   let llmClient: {
     chat: jest.Mock;
+  };
+  let toolExecutor: {
+    executeTool: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -46,12 +50,16 @@ describe('ConversationService', () => {
     llmClient = {
       chat: jest.fn(),
     };
+    toolExecutor = {
+      executeTool: jest.fn(),
+    };
 
     const module = await Test.createTestingModule({
       providers: [
         ConversationService,
         { provide: PrismaService, useValue: prisma },
         { provide: LlmClientService, useValue: llmClient },
+        { provide: ToolExecutorService, useValue: toolExecutor },
       ],
     }).compile();
 
@@ -82,8 +90,26 @@ describe('ConversationService', () => {
     const result = await service.findByProject('p1');
     expect(result).toEqual([]);
     expect(prisma.conversation.findMany).toHaveBeenCalledWith({
-      where: { projectId: 'p1' },
+      where: { projectId: 'p1', archived: false },
       orderBy: { updatedAt: 'desc' },
+    });
+  });
+
+  it('can include archived conversations', async () => {
+    prisma.conversation.findMany.mockResolvedValue([]);
+    await service.findByProject('p1', { archived: true });
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith({
+      where: { projectId: 'p1', archived: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+  });
+
+  it('updates a conversation', async () => {
+    prisma.conversation.update.mockResolvedValue({ id: 'clx1', title: 'Renamed' } as any);
+    await service.update('clx1', { title: 'Renamed' });
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: 'clx1' },
+      data: { title: 'Renamed' },
     });
   });
 
@@ -194,8 +220,10 @@ describe('ConversationService', () => {
       ]);
       llmClient.chat.mockResolvedValue({
         content: 'I will assign this task to a specialist worker.',
+        toolCalls: [],
         tokensIn: 20,
         tokensOut: 15,
+        finishReason: 'stop',
       });
       prisma.conversationMessage.create
         .mockResolvedValueOnce(userMessage)
@@ -211,6 +239,7 @@ describe('ConversationService', () => {
           expect.objectContaining({ role: 'system' }),
           expect.objectContaining({ role: 'user', content: 'Do something' }),
         ]),
+        expect.any(Array),
       );
 
       // Second message create should have LLM content

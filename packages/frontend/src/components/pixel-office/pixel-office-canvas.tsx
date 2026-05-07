@@ -20,14 +20,24 @@ interface AgentSprite {
 }
 
 const STATUS_COLORS: Record<string, number> = {
-  idle: 0x666666,
-  thinking: 0xffcc00,
-  coding: 0x22c55e,
-  testing: 0x3b82f6,
-  reviewing: 0xa855f7,
-  blocked: 0xef4444,
-  waiting_approval: 0xf97316,
-  done: 0x10b981,
+  idle: 0x888888,
+  thinking: 0x00e5ff,
+  coding: 0x39ff14,
+  testing: 0xffaa00,
+  reviewing: 0xb366ff,
+  blocked: 0xff0080,
+  waiting_approval: 0xffaa00,
+  done: 0x39ff14,
+};
+
+const ROLE_COLORS: Record<string, number> = {
+  orchestrator: 0xd4a574,
+  backend: 0x7c9a5e,
+  frontend: 0xc8956c,
+  qa: 0x8b7355,
+  devops: 0x9a7c5e,
+  reviewer: 0x8b7355,
+  worker: 0xc8956c,
 };
 
 const AGENT_SIZE = 60;
@@ -47,13 +57,27 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
     const sprite = spritesRef.current.get(agentId);
     if (!sprite) return;
     sprite.data.status = status;
-    const color = STATUS_COLORS[status] ?? 0x666666;
+    const color = STATUS_COLORS[status] ?? 0x888888;
     sprite.statusDot.clear();
     sprite.statusDot.beginFill(color);
     sprite.statusDot.drawCircle(0, 0, 6);
     sprite.statusDot.endFill();
     sprite.statusDot.x = AGENT_SIZE / 2 - 8;
     sprite.statusDot.y = -AGENT_SIZE / 2 + 8;
+
+    // Update body border color based on status
+    sprite.body.clear();
+    sprite.body.beginFill(0x2a2420);
+    sprite.body.drawRect(0, 0, AGENT_SIZE, AGENT_SIZE);
+    sprite.body.endFill();
+    // Inner area
+    sprite.body.beginFill(0x352f2a);
+    sprite.body.drawRect(3, 3, AGENT_SIZE - 6, AGENT_SIZE - 6);
+    sprite.body.endFill();
+    // Accent border top line
+    sprite.body.beginFill(color);
+    sprite.body.drawRect(3, 3, AGENT_SIZE - 6, 2);
+    sprite.body.endFill();
   }, []);
 
   const setAgents = useCallback(
@@ -65,7 +89,6 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
       spritesRef.current.forEach((s) => s.container.destroy({ children: true }));
       spritesRef.current.clear();
 
-      // Remove old agent containers from stage (keep any base layer)
       while (app.stage.children.length > 0) {
         app.stage.removeChildAt(0);
       }
@@ -85,19 +108,31 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
         agentContainer.eventMode = 'static';
         agentContainer.cursor = 'pointer';
 
-        // Body (desk)
+        const color = STATUS_COLORS[agent.status] ?? 0x888888;
+        const roleColor = ROLE_COLORS[agent.role] ?? 0xc8956c;
+
+        // Body — pixel-style square with accent top bar
         const body = new Graphics();
-        body.beginFill(0x1e293b);
-        body.drawRoundedRect(0, 0, AGENT_SIZE, AGENT_SIZE, 8);
+        body.beginFill(roleColor);
+        if (agent.role === 'orchestrator') {
+          body.drawRoundedRect(-2, -2, AGENT_SIZE + 4, AGENT_SIZE + 4, 10);
+        } else if (agent.role === 'qa' || agent.role === 'reviewer') {
+          body.drawRect(-1, -1, AGENT_SIZE + 2, AGENT_SIZE + 2);
+        } else {
+          body.drawRoundedRect(0, 0, AGENT_SIZE, AGENT_SIZE, 6);
+        }
         body.endFill();
-        // Inner accent
-        body.beginFill(0x334155);
-        body.drawRoundedRect(4, 4, AGENT_SIZE - 8, AGENT_SIZE - 8, 6);
+        // Inner area
+        body.beginFill(0x352f2a);
+        body.drawRoundedRect(4, 4, AGENT_SIZE - 8, AGENT_SIZE - 8, 5);
+        body.endFill();
+        // Accent top bar
+        body.beginFill(color);
+        body.drawRect(8, 8, AGENT_SIZE - 16, 3);
         body.endFill();
 
         // Status dot
         const statusDot = new Graphics();
-        const color = STATUS_COLORS[agent.status] ?? 0x666666;
         statusDot.beginFill(color);
         statusDot.drawCircle(0, 0, 6);
         statusDot.endFill();
@@ -107,7 +142,7 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
         // Name label
         const label = new Text(agent.name.substring(0, 8), {
           fontSize: 10,
-          fill: 0x94a3b8,
+          fill: 0xe0e0e0,
           fontFamily: 'monospace',
         });
         label.x = AGENT_SIZE / 2;
@@ -117,7 +152,7 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
         // Role text
         const roleLabel = new Text(agent.role.substring(0, 6), {
           fontSize: 8,
-          fill: 0x64748b,
+          fill: roleColor,
           fontFamily: 'monospace',
         });
         roleLabel.x = AGENT_SIZE / 2;
@@ -156,13 +191,12 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
     if (!canvasRef.current) return;
 
     const app = new Application({
-      backgroundColor: 0x0f172a,
+      backgroundColor: 0x0a0a0f,
       antialias: true,
       resizeTo: canvasRef.current,
     });
     appRef.current = app;
 
-    // Attach canvas to DOM
     canvasRef.current.appendChild(app.view as unknown as Node);
 
     // Load initial agents from REST endpoint
@@ -175,7 +209,7 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
           }
         })
         .catch(() => {
-          // Backend not running -- canvas stays empty until SSE connects
+          // Backend not running — canvas stays empty until SSE connects
         });
     }
 
@@ -186,7 +220,10 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
         try {
           const event = JSON.parse(msg.data);
           if (event.type === 'agent.status.changed' && event.agentId) {
-            const payload = JSON.parse(event.payload ?? '{}');
+            const payload =
+              event.payload && typeof event.payload === 'object'
+                ? event.payload
+                : {};
             updateAgentStatus(event.agentId, payload.status ?? 'idle');
           }
         } catch {
@@ -207,7 +244,7 @@ export function PixelOfficeCanvas({ onAgentClick }: { onAgentClick: (agent: Agen
   return (
     <div
       ref={canvasRef}
-      className="w-full h-[500px] rounded-lg border border-gray-800 overflow-hidden"
+      className="w-full h-[500px] rounded-sm border border-border-600 overflow-hidden"
     />
   );
 }

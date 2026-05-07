@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { AgentService } from './agent.service';
 import { Prisma } from '@prisma/client';
 
@@ -14,6 +14,26 @@ export class AgentController {
   @Get('templates')
   findAllTemplates() {
     return this.agentService.findAllTemplates();
+  }
+
+  @Get('templates/:id')
+  findOneTemplate(@Param('id') id: string) {
+    return this.agentService.findOneTemplate(id);
+  }
+
+  @Put('templates/:id')
+  updateTemplate(@Param('id') id: string, @Body() data: Prisma.AgentTemplateUpdateInput) {
+    return this.agentService.updateTemplate(id, data);
+  }
+
+  @Patch('templates/:id')
+  patchTemplate(@Param('id') id: string, @Body() data: Prisma.AgentTemplateUpdateInput) {
+    return this.agentService.updateTemplate(id, data);
+  }
+
+  @Delete('templates/:id')
+  removeTemplate(@Param('id') id: string) {
+    return this.agentService.removeTemplate(id);
   }
 
   @Post('instances')
@@ -36,6 +56,11 @@ export class AgentController {
 
   @Put('instances/:id')
   updateInstance(@Param('id') id: string, @Body() data: Prisma.AgentInstanceUpdateInput) {
+    return this.agentService.updateInstance(id, data);
+  }
+
+  @Patch('instances/:id')
+  patchInstance(@Param('id') id: string, @Body() data: Prisma.AgentInstanceUpdateInput) {
     return this.agentService.updateInstance(id, data);
   }
 

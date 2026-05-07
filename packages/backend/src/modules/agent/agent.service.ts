@@ -14,6 +14,18 @@ export class AgentService {
     return this.prisma.agentTemplate.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  findOneTemplate(id: string) {
+    return this.prisma.agentTemplate.findUnique({ where: { id } });
+  }
+
+  updateTemplate(id: string, data: Prisma.AgentTemplateUpdateInput) {
+    return this.prisma.agentTemplate.update({ where: { id }, data });
+  }
+
+  removeTemplate(id: string) {
+    return this.prisma.agentTemplate.delete({ where: { id } });
+  }
+
   createInstance(data: Prisma.AgentInstanceCreateInput) {
     return this.prisma.agentInstance.create({
       data,

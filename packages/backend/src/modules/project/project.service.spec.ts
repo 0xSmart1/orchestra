@@ -53,13 +53,40 @@ describe('ProjectService', () => {
     prisma.project.findMany.mockResolvedValue([]);
     const result = await service.findAll();
     expect(result).toEqual([]);
+    expect(prisma.project.findMany).toHaveBeenCalledWith({
+      where: { archived: false },
+      orderBy: { createdAt: 'desc' },
+      include: { defaultModelProfile: { select: { id: true, name: true, modelName: true } } },
+    });
+  });
+
+  it('can include archived projects', async () => {
+    prisma.project.findMany.mockResolvedValue([]);
+    await service.findAll({ archived: true });
+    expect(prisma.project.findMany).toHaveBeenCalledWith({
+      where: { archived: true },
+      orderBy: { createdAt: 'desc' },
+      include: { defaultModelProfile: { select: { id: true, name: true, modelName: true } } },
+    });
   });
 
   it('finds one project by id', async () => {
     const expected = { id: 'clx1', name: 'Test' };
     prisma.project.findUnique.mockResolvedValue(expected as any);
     const result = await service.findOne('clx1');
-    expect(prisma.project.findUnique).toHaveBeenCalledWith({ where: { id: 'clx1' } });
+    expect(prisma.project.findUnique).toHaveBeenCalledWith({
+      where: { id: 'clx1' },
+      include: { defaultModelProfile: { select: { id: true, name: true, modelName: true } } },
+    });
+  });
+
+  it('archives a project through partial update', async () => {
+    prisma.project.update.mockResolvedValue({ id: 'clx1', archived: true } as any);
+    await service.update('clx1', { archived: true });
+    expect(prisma.project.update).toHaveBeenCalledWith({
+      where: { id: 'clx1' },
+      data: { archived: true },
+    });
   });
 
   it('deletes a project', async () => {

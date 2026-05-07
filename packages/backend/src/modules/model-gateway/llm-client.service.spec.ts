@@ -22,7 +22,7 @@ describe('LlmClientService', () => {
     provider: {
       id: 'prov1',
       name: 'OpenAI',
-      baseUrl: 'https://api.openai.com',
+      baseUrl: 'https://api.openai.com/v1',
       authType: 'api_key',
     },
   };
@@ -180,7 +180,7 @@ describe('LlmClientService', () => {
   it('uses custom endpoint from profile when set', async () => {
     const profileWithEndpoint = {
       ...mockProfile,
-      endpoint: '/v1/chat/completions?version=2024-01-01',
+      endpoint: '/chat/completions?version=2024-01-01',
     };
     prisma.modelProfile.findUnique.mockResolvedValue(profileWithEndpoint);
     prisma.modelProfile.update.mockResolvedValue(profileWithEndpoint);

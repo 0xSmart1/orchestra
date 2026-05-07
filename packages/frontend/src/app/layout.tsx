@@ -3,6 +3,7 @@ import { JetBrains_Mono } from 'next/font/google';
 import { Sidebar } from '@/components/layout/sidebar';
 import { QueryProvider } from '@/lib/query-client';
 import { ProjectProvider } from '@/lib/project-context';
+import { I18nProvider } from '@/lib/i18n';
 import './globals.css';
 
 const jetbrains = JetBrains_Mono({
@@ -26,12 +27,14 @@ export default function RootLayout({
     <html lang="en" className={jetbrains.variable}>
       <body className="font-mono">
         <QueryProvider>
-          <ProjectProvider>
-            <Sidebar />
-            <main className="ml-[var(--sidebar-width)] min-h-screen">
-              {children}
-            </main>
-          </ProjectProvider>
+          <I18nProvider>
+            <ProjectProvider>
+              <Sidebar />
+              <main className="ml-[var(--sidebar-width)] min-h-screen">
+                {children}
+              </main>
+            </ProjectProvider>
+          </I18nProvider>
         </QueryProvider>
       </body>
     </html>

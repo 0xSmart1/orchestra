@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { Prisma } from '@prisma/client';
 
@@ -12,8 +12,8 @@ export class ProjectController {
   }
 
   @Get()
-  findAll() {
-    return this.projectService.findAll();
+  findAll(@Query('archived') archived?: string) {
+    return this.projectService.findAll({ archived: archived === 'true' });
   }
 
   @Get(':id')
@@ -23,6 +23,11 @@ export class ProjectController {
 
   @Put(':id')
   update(@Param('id') id: string, @Body() data: Prisma.ProjectUpdateInput) {
+    return this.projectService.update(id, data);
+  }
+
+  @Patch(':id')
+  patch(@Param('id') id: string, @Body() data: Prisma.ProjectUpdateInput) {
     return this.projectService.update(id, data);
   }
 

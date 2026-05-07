@@ -3,16 +3,17 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   useCallback,
   type ReactNode,
 } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 
 interface Project {
   id: string;
   name: string;
+  archived?: boolean;
 }
 
 interface ProjectContextValue {
@@ -20,6 +21,7 @@ interface ProjectContextValue {
   setSelectedProjectId: (id: string | null) => void;
   projects: Project[];
   loading: boolean;
+  refreshProjects: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextValue>({
@@ -27,44 +29,37 @@ const ProjectContext = createContext<ProjectContextValue>({
   setSelectedProjectId: () => {},
   projects: [],
   loading: true,
+  refreshProjects: async () => {},
 });
 
 const STORAGE_KEY = 'orchestra:selected-project';
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [projectId, setProjectId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(STORAGE_KEY);
+  });
 
-  // Load projects list on mount
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<Project[]>('/projects')
-      .then((list) => {
-        if (cancelled) return;
-        const arr = Array.isArray(list) ? list : [];
-        setProjects(arr);
+  const qc = useQueryClient();
 
-        // Restore selected project from localStorage
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored && arr.some((p) => p.id === stored)) {
-          setProjectId(stored);
-        } else if (arr.length > 0) {
-          // Auto-select first project if nothing stored
-          const firstId = arr[0].id;
-          setProjectId(firstId);
-          localStorage.setItem(STORAGE_KEY, firstId);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Use TanStack Query for projects — same cache key as Projects page
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
+    queryKey: ['projects'],
+    queryFn: () => apiFetch<Project[]>('/projects'),
+  });
+
+  // Auto-select: if stored ID gone, pick first available
+  const activeProjects = projects.filter((p) => !p.archived);
+
+  if (projectId && !activeProjects.some((p) => p.id === projectId) && activeProjects.length > 0) {
+    const firstId = activeProjects[0].id;
+    setProjectId(firstId);
+    localStorage.setItem(STORAGE_KEY, firstId);
+  } else if (!projectId && activeProjects.length > 0) {
+    const firstId = activeProjects[0].id;
+    setProjectId(firstId);
+    localStorage.setItem(STORAGE_KEY, firstId);
+  }
 
   const setSelectedProjectId = useCallback((id: string | null) => {
     setProjectId(id);
@@ -75,9 +70,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshProjects = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: ['projects'] });
+  }, [qc]);
+
   return (
     <ProjectContext.Provider
-      value={{ projectId, setSelectedProjectId, projects, loading }}
+      value={{ projectId, setSelectedProjectId, projects: activeProjects, loading: isLoading, refreshProjects }}
     >
       {children}
     </ProjectContext.Provider>

@@ -1,11 +1,5 @@
-// Standalone config — does NOT extend tsconfig.base.json because
-// NestJS requires module:"commonjs" + moduleResolution:"node",
-// which conflicts with the base's moduleResolution:"bundler".
-// Keep this in sync with base options when updating shared settings.
-// Standalone config — does NOT extend tsconfig.base.json because
-// NestJS requires module:"commonjs" + moduleResolution:"node",
-// which conflicts with the base's moduleResolution:"bundler".
-// Keep this in sync with base options when updating shared settings.
+// Used by NestJS CLI (nest build / nest start --watch).
+// Resolves @orchestra/shared via npm workspace symlink to dist/index.d.ts.
 {
   "compilerOptions": {
     "target": "ES2022",

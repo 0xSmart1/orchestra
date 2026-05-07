@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { API_BASE } from '@/lib/api';
 import { Header } from '@/components/layout/header';
 import { useProject } from '@/lib/project-context';
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -10,6 +11,7 @@ interface Conversation {
   id: string;
   projectId: string;
   title: string;
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +23,7 @@ interface ConversationMessage {
   agentId?: string;
   content: string;
   taskId?: string;
+  actions?: string; // JSON string: Array<{tool: string; args: Record<string, any>; result: string}>
   createdAt: string;
 }
 
@@ -28,14 +31,20 @@ export default function ChatPage() {
   const { projectId } = useProject();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [input, setInput] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   // --- Conversations list ---
   const { data: conversations = [] } = useQuery({
-    queryKey: ['conversations', projectId],
-    queryFn: () => apiFetch<Conversation[]>(`/conversations?projectId=${projectId ?? ''}`),
+    queryKey: ['conversations', projectId, showArchived],
+    queryFn: () =>
+      apiFetch<Conversation[]>(
+        `/conversations?projectId=${projectId ?? ''}&archived=${showArchived}`,
+      ),
     enabled: !!projectId,
   });
 
@@ -51,7 +60,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!selectedId) return;
     const es = new EventSource(
-      `http://localhost:3001/conversations/${selectedId}/stream`,
+      `${API_BASE}/conversations/${selectedId}/stream`,
     );
     es.onmessage = (msg) => {
       try {
@@ -79,21 +88,45 @@ export default function ChatPage() {
         body: JSON.stringify({ project: { connect: { id: projectId } }, title }),
       }),
     onSuccess: (conv) => {
-      qc.invalidateQueries({ queryKey: ['conversations', projectId] });
+      qc.invalidateQueries({ queryKey: ['conversations', projectId, showArchived] });
       setSelectedId(conv.id);
     },
   });
 
   // --- Send message ---
   const sendMessage = useMutation({
-    mutationFn: (content: string) =>
-      apiFetch<ConversationMessage>(`/conversations/${selectedId}/messages`, {
+    mutationFn: (vars: { conversationId: string; content: string }) =>
+      apiFetch<ConversationMessage>(`/conversations/${vars.conversationId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, projectId: projectId ?? '' }),
+        body: JSON.stringify({ content: vars.content, projectId: projectId ?? '' }),
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['messages', selectedId] });
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['messages', vars.conversationId] });
+      qc.invalidateQueries({ queryKey: ['agents', projectId] });
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] });
       setInput('');
+    },
+  });
+
+  const updateConversation = useMutation({
+    mutationFn: (vars: { id: string; data: Partial<Pick<Conversation, 'title' | 'archived'>> }) =>
+      apiFetch<Conversation>(`/conversations/${vars.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(vars.data),
+      }),
+    onSuccess: (conv) => {
+      qc.invalidateQueries({ queryKey: ['conversations', projectId, showArchived] });
+      qc.invalidateQueries({ queryKey: ['messages', conv.id] });
+      setEditingTitle(false);
+    },
+  });
+
+  const deleteConversation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<Conversation>(`/conversations/${id}`, { method: 'DELETE' }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['conversations', projectId, showArchived] });
+      if (selectedId === id) setSelectedId(null);
     },
   });
 
@@ -106,15 +139,13 @@ export default function ChatPage() {
       const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
       createConv.mutate(title, {
         onSuccess: (conv) => {
-          sendMessage.mutate(text, {
-            context: { conversationId: conv.id },
-          } as any);
+          sendMessage.mutate({ conversationId: conv.id, content: text });
         },
       });
       return;
     }
 
-    sendMessage.mutate(text);
+    sendMessage.mutate({ conversationId: selectedId, content: text });
   }, [input, selectedId, createConv, sendMessage]);
 
   // --- Handle Enter key ---
@@ -137,22 +168,28 @@ export default function ChatPage() {
     },
     orchestrator: {
       label: 'Orchestrator',
-      bubble: 'bg-surface-800 border-l-2 border-l-accent-cyan',
-      labelColor: 'text-accent-green',
+      bubble: 'bg-surface-800 border-l-2 border-l-accent-cyan glow-cyan',
+      labelColor: 'text-accent-green text-glow-green',
     },
     worker: {
       label: 'Worker',
-      bubble: 'bg-surface-800 border-l-2 border-l-accent-purple',
-      labelColor: 'text-accent-purple',
+      bubble: 'bg-surface-800 border-l-2 border-l-accent-purple glow-purple',
+      labelColor: 'text-accent-purple text-glow-purple',
     },
     system: {
       label: 'System',
-      bubble: 'bg-surface-900 border-l-2 border-l-accent-amber',
-      labelColor: 'text-accent-amber',
+      bubble: 'bg-surface-900 border-l-2 border-l-accent-amber glow-amber',
+      labelColor: 'text-accent-amber text-glow-amber',
     },
   };
 
   const selectedConversation = conversations.find((c) => c.id === selectedId);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setTitleDraft(selectedConversation.title);
+    }
+  }, [selectedConversation]);
 
   if (!projectId) {
     return (
@@ -182,20 +219,49 @@ export default function ChatPage() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {conversations.map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => setSelectedId(conv.id)}
-                className={`w-full text-left px-4 py-2.5 text-sm border-b border-border-600 hover:bg-surface-800 transition-colors ${
+                className={`group flex items-start gap-2 border-b border-border-600 hover:bg-surface-800 transition-colors ${
                   selectedId === conv.id
                     ? 'bg-surface-800 text-txt-primary shadow-[0_0_6px_rgba(0,229,255,0.2)] border-l-2 border-l-accent-cyan'
                     : 'text-txt-secondary'
                 }`}
               >
-                <div className="truncate">{conv.title}</div>
-                <div className="text-xs text-txt-secondary mt-0.5">
-                  {new Date(conv.updatedAt).toLocaleDateString()}
+                <button
+                  onClick={() => setSelectedId(conv.id)}
+                  className="min-w-0 flex-1 text-left px-4 py-2.5 text-sm"
+                >
+                  <div className="truncate">{conv.title}</div>
+                  <div className="text-xs text-txt-secondary mt-0.5">
+                    {new Date(conv.updatedAt).toLocaleDateString()}
+                  </div>
+                </button>
+                <div className="flex shrink-0 gap-1 pr-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    title={conv.archived ? 'Restore' : 'Archive'}
+                    onClick={() =>
+                      updateConversation.mutate({
+                        id: conv.id,
+                        data: { archived: !conv.archived },
+                      })
+                    }
+                    className="px-1.5 py-0.5 text-[10px] border border-border-600 text-txt-secondary hover:text-accent-amber"
+                  >
+                    {conv.archived ? 'Restore' : 'Archive'}
+                  </button>
+                  <button
+                    title="Delete"
+                    onClick={() => {
+                      if (confirm(`Delete conversation "${conv.title}"?`)) {
+                        deleteConversation.mutate(conv.id);
+                      }
+                    }}
+                    className="px-1.5 py-0.5 text-[10px] border border-border-600 text-txt-secondary hover:text-red-400"
+                  >
+                    Delete
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
             {conversations.length === 0 && (
               <p className="text-txt-secondary text-center text-xs py-6">
@@ -203,6 +269,18 @@ export default function ChatPage() {
               </p>
             )}
           </div>
+          <label className="flex items-center gap-2 px-4 py-3 border-t border-border-600 text-xs text-txt-secondary">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => {
+                setShowArchived(e.target.checked);
+                setSelectedId(null);
+              }}
+              className="h-3 w-3"
+            />
+            Archived
+          </label>
         </div>
 
         {/* --- Main area: messages + input --- */}
@@ -210,9 +288,38 @@ export default function ChatPage() {
           {/* Conversation header */}
           {selectedId && (
             <div className="h-10 shrink-0 border-b border-border-600 bg-surface-900 flex items-center px-4">
-              <span className="text-sm text-txt-primary truncate">
-                {selectedConversation?.title ?? 'Conversation'}
-              </span>
+              {editingTitle ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (selectedId && titleDraft.trim()) {
+                      updateConversation.mutate({
+                        id: selectedId,
+                        data: { title: titleDraft.trim() },
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-2 min-w-0"
+                >
+                  <input
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    className="h-7 w-64 bg-surface-800 text-sm"
+                    autoFocus
+                  />
+                  <button className="text-xs text-accent-cyan" type="submit">Save</button>
+                  <button className="text-xs text-txt-secondary" type="button" onClick={() => setEditingTitle(false)}>Cancel</button>
+                </form>
+              ) : (
+                <button
+                  onDoubleClick={() => setEditingTitle(true)}
+                  onClick={() => setEditingTitle(true)}
+                  className="text-sm text-txt-primary truncate text-left"
+                  title="Rename conversation"
+                >
+                  {selectedConversation?.title ?? 'Conversation'}
+                </button>
+              )}
             </div>
           )}
 
@@ -221,7 +328,7 @@ export default function ChatPage() {
             {!selectedId && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center text-txt-secondary">
-                  <p className="text-lg mb-2 text-accent-cyan">Orchestrator Chat</p>
+                  <p className="text-lg mb-2 text-accent-cyan text-glow-cyan">◈ Orchestrator Chat</p>
                   <p className="text-sm">
                     Select a conversation or start a new one.
                   </p>
@@ -259,6 +366,41 @@ export default function ChatPage() {
                     <div className="text-sm text-txt-primary whitespace-pre-wrap break-words">
                       {msg.content}
                     </div>
+                    {/* Action pills — show tools executed by orchestrator */}
+                    {msg.role === 'orchestrator' && msg.actions && (() => {
+                      try {
+                        const actions: Array<{tool: string; args: Record<string, any>; result: string}> = JSON.parse(msg.actions);
+                        if (!actions.length) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {actions.map((a, idx) => {
+                              const toolLabels: Record<string, string> = {
+                                create_agent: 'Agent',
+                                create_task: 'Task',
+                                run_worker: 'Run',
+                                list_agents: 'List Agents',
+                                list_tasks: 'List Tasks',
+                              };
+                              const toolColors: Record<string, string> = {
+                                create_agent: 'bg-accent-green/20 text-accent-green border-accent-green/40',
+                                create_task: 'bg-accent-purple/20 text-accent-purple border-accent-purple/40',
+                                run_worker: 'bg-accent-amber/20 text-accent-amber border-accent-amber/40',
+                                list_agents: 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40',
+                                list_tasks: 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40',
+                              };
+                              const label = toolLabels[a.tool] ?? a.tool;
+                              const color = toolColors[a.tool] ?? 'bg-surface-700 text-txt-secondary border-border-600';
+                              const detail = a.args.name || a.args.title || a.args.taskId?.slice(0, 8) || '';
+                              return (
+                                <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${color}`}>
+                                  {label}{detail ? `: ${detail}` : ''}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      } catch { return null; }
+                    })()}
                     <div className="text-xs text-txt-secondary mt-1">
                       {new Date(msg.createdAt).toLocaleTimeString()}
                     </div>

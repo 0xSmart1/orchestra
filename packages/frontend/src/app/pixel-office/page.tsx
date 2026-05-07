@@ -10,6 +10,9 @@ interface AgentData {
   name: string;
   role: string;
   status: string;
+  modelProfileId?: string | null;
+  currentTaskId?: string | null;
+  memoryPath?: string | null;
 }
 
 export default function PixelOfficePage() {
@@ -19,8 +22,8 @@ export default function PixelOfficePage() {
     <>
       <Header title="Pixel Office" />
       <div className="p-6">
-        <p className="text-xs text-gray-500 mb-4">
-          Live agent observability &mdash; click an agent for details
+        <p className="text-xs text-txt-secondary mb-4">
+          Live agent observability. Click an agent for details.
         </p>
         <div className="flex">
           <div className="flex-1">

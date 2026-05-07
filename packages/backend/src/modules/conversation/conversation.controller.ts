@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Query, Body, Param, Sse } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Query, Body, Param, Sse } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
 import { Prisma } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
@@ -16,8 +16,13 @@ export class ConversationController {
   }
 
   @Get()
-  findByProject(@Query('projectId') projectId: string) {
-    return this.conversationService.findByProject(projectId);
+  findByProject(
+    @Query('projectId') projectId: string,
+    @Query('archived') archived?: string,
+  ) {
+    return this.conversationService.findByProject(projectId, {
+      archived: archived === 'true',
+    });
   }
 
   @Get(':id')
@@ -28,6 +33,11 @@ export class ConversationController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.conversationService.remove(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() data: Prisma.ConversationUpdateInput) {
+    return this.conversationService.update(id, data);
   }
 
   @Post(':id/messages')

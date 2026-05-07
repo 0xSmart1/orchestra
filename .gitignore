@@ -18,5 +18,3 @@ packages/shared/src/**/*.d.ts.map
 Thumbs.db
 desktop.ini
 .claude/
-!.claude/plugins/
-!.claude/settings.json

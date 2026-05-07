@@ -27,12 +27,21 @@ interface ConversationMessage {
   createdAt: string;
 }
 
+interface ModelProfile {
+  id: string;
+  name: string;
+  modelName: string;
+  providerId: string;
+  provider?: { name: string; kind?: string };
+}
+
 export default function ChatPage() {
   const { projectId } = useProject();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [selectedModelProfileId, setSelectedModelProfileId] = useState<string>('');
   const [titleDraft, setTitleDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +64,12 @@ export default function ChatPage() {
     enabled: !!selectedId,
   });
   const messages = messagesData?.messages ?? [];
+
+  // --- Available model profiles for selector ---
+  const { data: modelProfiles = [] } = useQuery({
+    queryKey: ['model-profiles'],
+    queryFn: () => apiFetch<ModelProfile[]>('/models/profiles'),
+  });
 
   // --- SSE: listen for new messages in the selected conversation ---
   useEffect(() => {
@@ -95,10 +110,14 @@ export default function ChatPage() {
 
   // --- Send message ---
   const sendMessage = useMutation({
-    mutationFn: (vars: { conversationId: string; content: string }) =>
+    mutationFn: (vars: { conversationId: string; content: string; modelProfileId?: string }) =>
       apiFetch<ConversationMessage>(`/conversations/${vars.conversationId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content: vars.content, projectId: projectId ?? '' }),
+        body: JSON.stringify({
+          content: vars.content,
+          projectId: projectId ?? '',
+          ...(vars.modelProfileId ? { modelProfileId: vars.modelProfileId } : {}),
+        }),
       }),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['messages', vars.conversationId] });
@@ -135,18 +154,20 @@ export default function ChatPage() {
     const text = input.trim();
     if (!text) return;
 
+    const modelProfileId = selectedModelProfileId || undefined;
+
     if (!selectedId) {
       const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
       createConv.mutate(title, {
         onSuccess: (conv) => {
-          sendMessage.mutate({ conversationId: conv.id, content: text });
+          sendMessage.mutate({ conversationId: conv.id, content: text, modelProfileId });
         },
       });
       return;
     }
 
-    sendMessage.mutate({ conversationId: selectedId, content: text });
-  }, [input, selectedId, createConv, sendMessage]);
+    sendMessage.mutate({ conversationId: selectedId, content: text, modelProfileId });
+  }, [input, selectedId, createConv, sendMessage, selectedModelProfileId]);
 
   // --- Handle Enter key ---
   const handleKeyDown = useCallback(
@@ -424,6 +445,19 @@ export default function ChatPage() {
           {/* Input */}
           <div className="shrink-0 border-t border-border-600 bg-surface-900 p-3">
             <div className="flex gap-2">
+              <select
+                value={selectedModelProfileId}
+                onChange={(e) => setSelectedModelProfileId(e.target.value)}
+                className="shrink-0 bg-surface-800 text-txt-primary px-2 py-2 rounded-md text-xs border border-border-600 focus:border-accent-amber focus:outline-none max-w-[180px] truncate"
+                title="Select model"
+              >
+                <option value="">Default model</option>
+                {modelProfiles.map((mp) => (
+                  <option key={mp.id} value={mp.id}>
+                    {mp.modelName}
+                  </option>
+                ))}
+              </select>
               <input
                 ref={inputRef}
                 value={input}
@@ -431,12 +465,12 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
                 disabled={sendMessage.isPending || createConv.isPending}
-                className="flex-1 bg-surface-800 text-txt-primary px-3 py-2 rounded-sm text-sm border border-border-600 focus:border-accent-cyan focus:outline-none placeholder-txt-secondary disabled:opacity-50"
+                className="flex-1 bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none placeholder-txt-secondary disabled:opacity-50"
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || sendMessage.isPending || createConv.isPending}
-                className="px-4 py-2 bg-accent-cyan text-surface-900 text-sm rounded-sm hover:shadow-[0_0_8px_rgba(0,229,255,0.3)] disabled:opacity-50"
+                className="px-4 py-2 bg-accent-amber text-surface-900 text-sm rounded-md hover:opacity-90 disabled:opacity-50"
               >
                 Send
               </button>

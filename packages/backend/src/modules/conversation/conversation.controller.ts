@@ -43,12 +43,13 @@ export class ConversationController {
   @Post(':id/messages')
   async sendMessage(
     @Param('id') conversationId: string,
-    @Body() body: { content: string; projectId: string },
+    @Body() body: { content: string; projectId: string; modelProfileId?: string },
   ) {
     const message = await this.conversationService.orchestratorRespond(
       conversationId,
       body.content,
       body.projectId,
+      body.modelProfileId,
     );
     chatSubject.next({ conversationId, message });
     return message;

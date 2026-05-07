@@ -10,6 +10,7 @@ interface ModelProvider {
   id: string;
   name: string;
   baseUrl: string;
+  kind?: string;
   authType: string;
   encryptedSecretRef: string | null;
   profiles?: ModelProfile[];
@@ -187,9 +188,13 @@ export default function ModelsPage() {
         </div>
 
         {showProviderForm && (
-          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createProvider.mutate({ name: fd.get('name'), baseUrl: fd.get('baseUrl'), authType: fd.get('authType') || 'api_key' }); }} className="mb-4 p-4 border border-border-600 rounded-lg space-y-3 bg-surface-900">
+          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); createProvider.mutate({ name: fd.get('name'), baseUrl: fd.get('baseUrl'), kind: fd.get('kind') || 'openai_compat', authType: fd.get('authType') || 'api_key' }); }} className="mb-4 p-4 border border-border-600 rounded-lg space-y-3 bg-surface-900">
             <input name="name" placeholder={t('models.providerName')} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none" required />
             <input name="baseUrl" placeholder={t('models.providerUrl')} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none" required />
+            <select name="kind" defaultValue="openai_compat" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none">
+              <option value="openai_compat">OpenAI-compatible</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
             <select name="authType" className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none">
               <option value="api_key">API Key</option>
               <option value="oauth">OAuth</option>
@@ -203,9 +208,13 @@ export default function ModelsPage() {
           {providers.map((p) => (
             <div key={p.id} className="p-3 border border-border-600 rounded-lg bg-surface-900 hover:border-accent-amber/40 transition-colors">
               {editingProviderId === p.id ? (
-                <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); updateProvider.mutate({ id: p.id, name: fd.get('name'), baseUrl: fd.get('baseUrl'), authType: fd.get('authType') }); }} className="space-y-2">
+                <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); updateProvider.mutate({ id: p.id, name: fd.get('name'), baseUrl: fd.get('baseUrl'), kind: fd.get('kind') || 'openai_compat', authType: fd.get('authType') }); }} className="space-y-2">
                   <input name="name" defaultValue={p.name} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none" required />
                   <input name="baseUrl" defaultValue={p.baseUrl} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none" required />
+                  <select name="kind" defaultValue={p.kind ?? 'openai_compat'} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none">
+                    <option value="openai_compat">OpenAI-compatible</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
                   <select name="authType" defaultValue={p.authType} className="w-full bg-surface-800 text-txt-primary px-3 py-2 rounded-md text-sm border border-border-600 focus:border-accent-amber focus:outline-none">
                     <option value="api_key">API Key</option>
                     <option value="oauth">OAuth</option>
@@ -220,7 +229,10 @@ export default function ModelsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium text-sm text-txt-primary">{p.name}</span>
-                      <span className="text-xs text-txt-secondary ml-2">{p.baseUrl}</span>
+                      <span className="text-xs text-txt-secondary ml-2">
+                        {p.baseUrl}
+                        {p.kind === 'anthropic' && <span className="ml-2 px-1.5 py-0.5 rounded-md bg-accent-amber/15 text-accent-amber text-[10px] uppercase">Anthropic</span>}
+                      </span>
                     </div>
                     <div className="flex gap-1">
                       <button

@@ -67,6 +67,7 @@ export class ConversationService {
     conversationId: string,
     userMessage: string,
     projectId: string,
+    modelProfileIdOverride?: string,
   ) {
     // Save user message
     await this.addMessage({
@@ -75,13 +76,14 @@ export class ConversationService {
       content: userMessage,
     });
 
-    // Get project's default model profile
+    // Resolve model profile: explicit override > project default
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { defaultModelProfileId: true },
     });
+    const modelProfileId = modelProfileIdOverride ?? project?.defaultModelProfileId;
 
-    if (!project?.defaultModelProfileId) {
+    if (!modelProfileId) {
       // No model profile configured — use stub
       const content =
         `[Orchestrator — Stub] No model profile configured for this project. ` +
@@ -126,7 +128,7 @@ export class ConversationService {
       let result: ChatResult;
       try {
         result = await this.llmClient.chat(
-          project.defaultModelProfileId,
+          modelProfileId,
           chatMessages,
           ORCHESTRATOR_TOOLS,
         );

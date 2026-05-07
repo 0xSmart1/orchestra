@@ -23,6 +23,7 @@ describe('LlmClientService', () => {
       id: 'prov1',
       name: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1',
+      kind: 'openai_compat',
       authType: 'api_key',
     },
   };
@@ -204,6 +205,158 @@ describe('LlmClientService', () => {
     } finally {
       globalThis.fetch = originalFetch;
       delete process.env.LLM_API_KEY;
+    }
+  });
+});
+
+describe('Anthropic provider', () => {
+  let service: LlmClientService;
+  let prisma: {
+    modelProfile: {
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+  };
+
+  const anthropicProfile = {
+    id: 'profile_anthropic',
+    name: 'Claude',
+    modelName: 'claude-opus-4-7',
+    endpoint: null,
+    contextLimitTokens: 8192,
+    budgetLimit: 10,
+    budgetUsed: 0,
+    provider: {
+      id: 'prov_anthropic',
+      name: 'Anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      kind: 'anthropic',
+      authType: 'api_key',
+    },
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      modelProfile: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+
+    const module = await Test.createTestingModule({
+      providers: [LlmClientService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = module.get(LlmClientService);
+  });
+
+  it('uses x-api-key + anthropic-version and parses content blocks', async () => {
+    prisma.modelProfile.findUnique.mockResolvedValue(anthropicProfile);
+    prisma.modelProfile.update.mockResolvedValue(anthropicProfile);
+    process.env.LLM_API_KEY_ANTHROPIC = 'sk-ant-test';
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [{ type: 'text', text: 'Hello from Claude!' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 12, output_tokens: 6 },
+      }),
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mockFetch as any;
+
+    try {
+      const result = await service.chat('profile_anthropic', [
+        { role: 'system', content: 'You are concise.' },
+        { role: 'user', content: 'Hello' },
+      ]);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe('https://api.anthropic.com/v1/messages');
+      expect(options.headers['x-api-key']).toBe('sk-ant-test');
+      expect(options.headers['anthropic-version']).toBe('2023-06-01');
+      expect(options.headers.Authorization).toBeUndefined();
+
+      const body = JSON.parse(options.body);
+      expect(body.model).toBe('claude-opus-4-7');
+      expect(body.system).toBe('You are concise.');
+      expect(body.messages).toEqual([{ role: 'user', content: 'Hello' }]);
+
+      expect(result.content).toBe('Hello from Claude!');
+      expect(result.tokensIn).toBe(12);
+      expect(result.tokensOut).toBe(6);
+      expect(result.finishReason).toBe('stop');
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.LLM_API_KEY_ANTHROPIC;
+    }
+  });
+
+  it('translates assistant tool_calls to tool_use blocks and tool results to user tool_result blocks', async () => {
+    prisma.modelProfile.findUnique.mockResolvedValue(anthropicProfile);
+    prisma.modelProfile.update.mockResolvedValue(anthropicProfile);
+    process.env.LLM_API_KEY_ANTHROPIC = 'sk-ant-test';
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [
+          { type: 'tool_use', id: 'toolu_2', name: 'get_weather', input: { city: 'Berlin' } },
+        ],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 30, output_tokens: 8 },
+      }),
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mockFetch as any;
+
+    try {
+      const result = await service.chat(
+        'profile_anthropic',
+        [
+          { role: 'user', content: 'Weather?' },
+          {
+            role: 'assistant',
+            content: null,
+            toolCalls: [
+              { id: 'toolu_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Berlin"}' } },
+            ],
+          },
+          { role: 'tool', toolCallId: 'toolu_1', content: '{"temp":10}' },
+        ],
+        [
+          {
+            type: 'function',
+            function: { name: 'get_weather', description: 'Get weather', parameters: { type: 'object' } },
+          },
+        ],
+      );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.tools).toEqual([
+        { name: 'get_weather', description: 'Get weather', input_schema: { type: 'object' } },
+      ]);
+      expect(body.messages).toEqual([
+        { role: 'user', content: 'Weather?' },
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'toolu_1', name: 'get_weather', input: { city: 'Berlin' } }],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '{"temp":10}' }],
+        },
+      ]);
+
+      expect(result.toolCalls).toEqual([
+        { id: 'toolu_2', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Berlin"}' } },
+      ]);
+      expect(result.finishReason).toBe('tool_calls');
+      expect(result.content).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.LLM_API_KEY_ANTHROPIC;
     }
   });
 });

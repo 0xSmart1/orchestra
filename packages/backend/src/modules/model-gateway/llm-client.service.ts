@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
+export type ProviderKind = 'openai_compat' | 'anthropic';
+
 export interface ToolDefinition {
   type: 'function';
   function: {
@@ -34,6 +36,8 @@ export interface ChatResult {
   finishReason: string | null; // "stop", "tool_calls", etc.
 }
 
+const ANTHROPIC_VERSION = '2023-06-01';
+
 @Injectable()
 export class LlmClientService {
   private readonly logger = new Logger(LlmClientService.name);
@@ -41,9 +45,8 @@ export class LlmClientService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Send a chat completion request to an OpenAI-compatible LLM API.
-   * Looks up the model profile + provider from the database, resolves the
-   * API key from environment variables, and calls the endpoint.
+   * Send a chat completion request to an LLM API.
+   * Dispatches to OpenAI-compatible or Anthropic based on provider.kind.
    *
    * Convention for env keys (MVP):
    *   LLM_API_KEY_<PROVIDER_NAME_UPPERCASE>  — per-provider key
@@ -74,7 +77,43 @@ export class LlmClientService {
       );
     }
 
-    // Build URL
+    const kind = (provider.kind ?? 'openai_compat') as ProviderKind;
+    const maxTokens = profile.contextLimitTokens
+      ? Math.min(profile.contextLimitTokens, 4096)
+      : 4096;
+
+    this.logger.log(
+      `Calling LLM: kind=${kind} provider=${provider.name} model=${profile.modelName} messages=${messages.length}${tools ? ` tools=${tools.length}` : ''}`,
+    );
+
+    const result =
+      kind === 'anthropic'
+        ? await this.chatAnthropic(profile, provider, apiKey, messages, tools, maxTokens)
+        : await this.chatOpenAi(profile, provider, apiKey, messages, tools, maxTokens);
+
+    // Rough budget tracking — will be refined with actual pricing per model
+    if (profile.budgetLimit !== null && profile.budgetLimit !== undefined) {
+      await this.prisma.modelProfile.update({
+        where: { id: profileId },
+        data: { budgetUsed: { increment: 0.001 } },
+      });
+    }
+
+    this.logger.log(
+      `LLM response: tokensIn=${result.tokensIn} tokensOut=${result.tokensOut} contentLength=${result.content?.length ?? 0} toolCalls=${result.toolCalls.length} finishReason=${result.finishReason}`,
+    );
+
+    return result;
+  }
+
+  private async chatOpenAi(
+    profile: any,
+    provider: any,
+    apiKey: string,
+    messages: ChatMessage[],
+    tools: ToolDefinition[] | undefined,
+    maxTokens: number,
+  ): Promise<ChatResult> {
     const baseUrl = provider.baseUrl.replace(/\/$/, '');
     const endpoint = profile.endpoint || '/chat/completions';
     const url = /^https?:\/\//i.test(endpoint) ? endpoint : `${baseUrl}${endpoint}`;
@@ -107,11 +146,6 @@ export class LlmClientService {
       return { role, content: m.content ?? '' };
     });
 
-    const maxTokens = profile.contextLimitTokens
-      ? Math.min(profile.contextLimitTokens, 4096)
-      : 4096;
-
-    // Build request body
     const body: Record<string, any> = {
       model: profile.modelName,
       messages: mappedMessages,
@@ -124,10 +158,6 @@ export class LlmClientService {
       body.tools = tools;
       body.tool_choice = 'auto';
     }
-
-    this.logger.log(
-      `Calling LLM: provider=${provider.name} model=${profile.modelName} url=${url} messages=${mappedMessages.length}${tools ? ` tools=${tools.length}` : ''}`,
-    );
 
     const response = await fetch(url, {
       method: 'POST',
@@ -171,21 +201,136 @@ export class LlmClientService {
       },
     }));
 
-    const tokensIn = data.usage?.prompt_tokens ?? 0;
-    const tokensOut = data.usage?.completion_tokens ?? 0;
+    return {
+      content,
+      toolCalls,
+      tokensIn: data.usage?.prompt_tokens ?? 0,
+      tokensOut: data.usage?.completion_tokens ?? 0,
+      finishReason,
+    };
+  }
 
-    // Rough budget tracking — will be refined with actual pricing per model
-    if (profile.budgetLimit !== null && profile.budgetLimit !== undefined) {
-      await this.prisma.modelProfile.update({
-        where: { id: profileId },
-        data: { budgetUsed: { increment: 0.001 } },
-      });
+  private async chatAnthropic(
+    profile: any,
+    provider: any,
+    apiKey: string,
+    messages: ChatMessage[],
+    tools: ToolDefinition[] | undefined,
+    maxTokens: number,
+  ): Promise<ChatResult> {
+    const baseUrl = provider.baseUrl.replace(/\/$/, '');
+    const endpoint = profile.endpoint || '/v1/messages';
+    const url = /^https?:\/\//i.test(endpoint) ? endpoint : `${baseUrl}${endpoint}`;
+
+    // Aggregate all system messages into Anthropic's top-level `system`.
+    const systemParts: string[] = [];
+    const nonSystem: ChatMessage[] = [];
+    for (const m of messages) {
+      if (m.role === 'system') {
+        if (m.content) systemParts.push(m.content);
+      } else {
+        nonSystem.push(m);
+      }
     }
 
-    this.logger.log(
-      `LLM response: tokensIn=${tokensIn} tokensOut=${tokensOut} contentLength=${content?.length ?? 0} toolCalls=${toolCalls.length} finishReason=${finishReason}`,
-    );
+    const mappedMessages = nonSystem.map((m) => {
+      if (m.role === 'tool') {
+        return {
+          role: 'user' as const,
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: m.toolCallId,
+              content: m.content ?? '',
+            },
+          ],
+        };
+      }
+      if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+        const blocks: any[] = [];
+        if (m.content) blocks.push({ type: 'text', text: m.content });
+        for (const tc of m.toolCalls) {
+          let input: any = {};
+          try {
+            input = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+          } catch {
+            input = { _raw: tc.function.arguments };
+          }
+          blocks.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input });
+        }
+        return { role: 'assistant' as const, content: blocks };
+      }
+      return {
+        role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: m.content ?? '',
+      };
+    });
 
-    return { content, toolCalls, tokensIn, tokensOut, finishReason };
+    const body: Record<string, any> = {
+      model: profile.modelName,
+      max_tokens: maxTokens,
+      messages: mappedMessages,
+    };
+
+    if (systemParts.length > 0) body.system = systemParts.join('\n\n');
+
+    if (tools && tools.length > 0) {
+      body.tools = tools.map((t) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+      }));
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`LLM API error (${response.status}): ${errorText}`);
+    }
+
+    const data = (await response.json()) as any;
+    let content = '';
+    const toolCalls: ToolCall[] = [];
+    for (const block of data.content ?? []) {
+      if (block.type === 'text') {
+        content += block.text ?? '';
+      } else if (block.type === 'tool_use') {
+        toolCalls.push({
+          id: block.id,
+          type: 'function' as const,
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.input ?? {}),
+          },
+        });
+      }
+    }
+
+    const stopReasonMap: Record<string, string> = {
+      end_turn: 'stop',
+      tool_use: 'tool_calls',
+      max_tokens: 'length',
+      stop_sequence: 'stop',
+    };
+    const finishReason = data.stop_reason
+      ? stopReasonMap[data.stop_reason] ?? data.stop_reason
+      : null;
+
+    return {
+      content: toolCalls.length > 0 && content === '' ? null : content,
+      toolCalls,
+      tokensIn: data.usage?.input_tokens ?? 0,
+      tokensOut: data.usage?.output_tokens ?? 0,
+      finishReason,
+    };
   }
 }

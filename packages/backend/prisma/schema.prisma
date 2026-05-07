@@ -76,6 +76,7 @@ model ModelProvider {
   id                  String   @id @default(cuid())
   name                String
   baseUrl             String
+  kind                String   @default("openai_compat")
   authType            String   @default("api_key")
   encryptedSecretRef  String?
   createdAt           DateTime @default(now())

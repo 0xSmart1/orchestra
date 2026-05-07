@@ -47,8 +47,11 @@ export class ModelGatewayService {
   /**
    * List models available from a provider by calling its /v1/models endpoint.
    * Works with any OpenAI-compatible API (OmniRoute, OpenAI, etc.)
+   * and Anthropic API (uses x-api-key + anthropic-version headers).
    */
-  async listAvailableModels(providerId: string): Promise<{ id: string; object: string; owned_by?: string }[]> {
+  async listAvailableModels(
+    providerId: string,
+  ): Promise<{ id: string; object?: string; owned_by?: string }[]> {
     const provider = await this.prisma.modelProvider.findUnique({ where: { id: providerId } });
     if (!provider) {
       throw new Error(`Provider not found: ${providerId}`);
@@ -62,15 +65,15 @@ export class ModelGatewayService {
 
     const baseUrl = provider.baseUrl.replace(/\/$/, '');
     const url = `${baseUrl}/v1/models`;
+    const kind = (provider.kind ?? 'openai_compat') as 'openai_compat' | 'anthropic';
+    const headers: Record<string, string> =
+      kind === 'anthropic'
+        ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
+        : { Authorization: `Bearer ${apiKey}` };
 
-    this.logger.log(`Fetching available models from ${url}`);
+    this.logger.log(`Fetching available models from ${url} (kind=${kind})`);
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
+    const response = await fetch(url, { method: 'GET', headers });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -78,9 +81,13 @@ export class ModelGatewayService {
     }
 
     const data = (await response.json()) as {
-      data?: Array<{ id: string; object: string; owned_by?: string }>;
+      data?: Array<{ id: string; object?: string; type?: string; display_name?: string; owned_by?: string }>;
     };
 
-    return data.data ?? [];
+    return (data.data ?? []).map((m) => ({
+      id: m.id,
+      object: m.object ?? m.type,
+      owned_by: m.owned_by ?? m.display_name,
+    }));
   }
 }
